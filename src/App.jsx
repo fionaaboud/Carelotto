@@ -370,6 +370,7 @@ export default function App() {
   const [plays, setPlays] = useState(0);
   const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
   const [lastPurchase, setLastPurchase] = useState(null);
+  const [purchases, setPurchases] = useState([]);
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
   const split = useMemo(
     () => ({
@@ -380,18 +381,30 @@ export default function App() {
     }),
     [plays],
   );
+  const causeTotals = useMemo(
+    () =>
+      causes.map((cause) => ({
+        ...cause,
+        total: purchases.filter((purchase) => purchase.cause === cause.name).length,
+      })),
+    [causes, purchases],
+  );
 
   function handlePurchase() {
     setPlays((count) => {
       const nextCount = count + 1;
-      setLastPurchase({
+      const purchase = {
         ticketNumber: nextCount,
         cause: selectedCause.name,
         total: ticketPrice,
         artist: 1,
         causeShare: 1,
         lottery: 1,
-      });
+      };
+
+      setLastPurchase(purchase);
+      setPurchases((current) => [...current, purchase]);
+
       return nextCount;
     });
   }
@@ -544,20 +557,53 @@ export default function App() {
 
       <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
         <BlueprintFrame className="p-6 md:p-8">
-          <div className="grid gap-8 md:grid-cols-[.8fr_1.2fr]">
+          <div className="grid gap-8 lg:grid-cols-[.7fr_1.3fr]">
             <div>
               <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
-                <Gift className="h-4 w-4 text-[#df8076]" /> Example impact
+                <Gift className="h-4 w-4 text-[#df8076]" /> Impact dashboard
               </div>
               <h2 className="mt-3 font-serif text-4xl text-[#2f350d]">
-                The dispensed artwork becomes a record of care.
+                Every purchase updates the care ledger.
               </h2>
+              <p className="mt-4 leading-8 text-[#24221f]/75">
+                The dashboard mirrors the contract split so judges can see how artist funding, cause support, and
+                the lottery pool move together.
+              </p>
             </div>
-            <p className="leading-8 text-[#24221f]/75">
-              A play can dispense a collectible artwork connected to a social care project, while also generating
-              a receipt that records participation. The website can later connect to payment, QR onboarding, NFT
-              receipts, winner selection, and transparent impact tracking.
-            </p>
+            <div className="grid gap-4">
+              <div className="grid gap-3 sm:grid-cols-4">
+                {[
+                  ['Tickets', plays],
+                  ['Artist', `$${split.artist}`],
+                  ['Causes', `$${split.cause}`],
+                  ['Lottery', `$${split.lottery}`],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                    <div className="mt-2 font-serif text-3xl text-[#2f350d]">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="mb-3 font-mono text-xs uppercase tracking-wider">Cause totals</div>
+                <div className="grid gap-3">
+                  {causeTotals.map((cause) => (
+                    <div key={cause.name} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div>
+                        <div className="font-serif text-xl">{cause.name}</div>
+                        <div className="font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+                          {cause.wallet}
+                        </div>
+                      </div>
+                      <div className="font-mono text-xs uppercase tracking-wider">
+                        ${cause.total} from {cause.total} purchase{cause.total === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </BlueprintFrame>
       </section>
