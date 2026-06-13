@@ -22,6 +22,8 @@ contract CareLottoSplit {
         uint256 pool;
         bool isOpen;
         bool winnerRequested;
+        uint256 vrfRequestId;
+        uint256 randomWord;
         address winner;
     }
 
@@ -43,7 +45,14 @@ contract CareLottoSplit {
     event LotteryRoundOpened(uint256 indexed roundId);
     event LotteryEntryRecorded(uint256 indexed roundId, address indexed purchaser, uint256 lotteryShare);
     event LotteryRoundClosed(uint256 indexed roundId, uint256 entryCount, uint256 pool);
-    event LotteryWinnerRequested(uint256 indexed roundId);
+    event LotteryWinnerRequested(uint256 indexed roundId, uint256 indexed requestId);
+    event LotteryWinnerSelected(
+        uint256 indexed roundId,
+        uint256 indexed requestId,
+        address indexed winner,
+        uint256 winningEntryIndex,
+        uint256 randomWord
+    );
     event LotteryPrizeWithdrawn(address indexed winner, uint256 amount);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -72,6 +81,8 @@ contract CareLottoSplit {
             pool: 0,
             isOpen: true,
             winnerRequested: false,
+            vrfRequestId: 0,
+            randomWord: 0,
             winner: address(0)
         });
 
@@ -125,13 +136,28 @@ contract CareLottoSplit {
         emit LotteryRoundClosed(currentRoundId, round.entryCount, round.pool);
     }
 
-    function requestLotteryWinner() external onlyOwner {
+    function requestLotteryWinner(uint256 requestId) external onlyOwner {
         LotteryRound storage round = lotteryRounds[currentRoundId];
         if (round.isOpen) revert LotteryRoundStillOpen();
 
         round.winnerRequested = true;
+        round.vrfRequestId = requestId;
 
-        emit LotteryWinnerRequested(currentRoundId);
+        emit LotteryWinnerRequested(currentRoundId, requestId);
+    }
+
+    function recordLotteryWinner(uint256 roundId, uint256 randomWord) external onlyOwner {
+        LotteryRound storage round = lotteryRounds[roundId];
+        if (round.isOpen) revert LotteryRoundStillOpen();
+        if (round.entryCount == 0) revert InvalidPayment();
+
+        uint256 winningEntryIndex = randomWord % round.entryCount;
+        address winner = lotteryRoundEntries[roundId][winningEntryIndex];
+
+        round.randomWord = randomWord;
+        round.winner = winner;
+
+        emit LotteryWinnerSelected(roundId, round.vrfRequestId, winner, winningEntryIndex, randomWord);
     }
 
     function openNextLotteryRound() external onlyOwner {
@@ -144,6 +170,8 @@ contract CareLottoSplit {
             pool: 0,
             isOpen: true,
             winnerRequested: false,
+            vrfRequestId: 0,
+            randomWord: 0,
             winner: address(0)
         });
 

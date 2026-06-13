@@ -853,12 +853,20 @@ export default function App() {
     id: 1,
     status: 'open',
     winnerRequest: 'not_requested',
+    vrfRequestId: null,
+    randomWord: null,
+    winningEntry: null,
+    prizeClaimStatus: 'not_ready',
   });
   const selectedArt = artOptions.find((art) => art.id === selectedArtId) ?? artOptions[0];
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
   const currentRoundEntries = useMemo(
     () => purchases.filter((purchase) => purchase.roundId === lotteryRound.id),
     [lotteryRound.id, purchases],
+  );
+  const closedRoundEntries = useMemo(
+    () => purchases.filter((purchase) => purchase.roundId === lotteryRound.winningEntry?.roundId),
+    [lotteryRound.winningEntry?.roundId, purchases],
   );
   const split = useMemo(
     () => ({
@@ -1059,18 +1067,34 @@ export default function App() {
   }
 
   function handleRequestLotteryWinner() {
-    if (lotteryRound.status !== 'closed') {
+    if (lotteryRound.status !== 'closed' || currentRoundEntries.length === 0) {
       return;
     }
 
+    const requestId = `vrf-${lotteryRound.id}-${String(Date.now()).slice(-6)}`;
+    const randomWord = currentRoundEntries.reduce((seed, entry, index) => {
+      const artScore = entry.artTitle.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0);
+      return seed + artScore + entry.ticketNumber * (index + 7);
+    }, lotteryRound.id * 7919);
+    const winningEntryIndex = randomWord % currentRoundEntries.length;
+    const winningEntry = {
+      ...currentRoundEntries[winningEntryIndex],
+      winningEntryIndex,
+    };
+
     setLotteryRound((round) => ({
       ...round,
-      winnerRequest: 'requested',
+      status: 'fulfilled',
+      winnerRequest: 'fulfilled',
+      vrfRequestId: requestId,
+      randomWord,
+      winningEntry,
+      prizeClaimStatus: 'ready',
     }));
   }
 
   function handleOpenNextLotteryRound() {
-    if (lotteryRound.status === 'open') {
+    if (lotteryRound.status === 'open' || !lotteryRound.winningEntry) {
       return;
     }
 
@@ -1078,6 +1102,10 @@ export default function App() {
       id: round.id + 1,
       status: 'open',
       winnerRequest: 'not_requested',
+      vrfRequestId: null,
+      randomWord: null,
+      winningEntry: null,
+      prizeClaimStatus: 'not_ready',
     }));
 
     setWorldVerification({
@@ -1088,6 +1116,17 @@ export default function App() {
     setWorldRpContext(null);
     setWorldProofSignal(null);
     setIsWorldWidgetOpen(false);
+  }
+
+  function handleMarkPrizeClaimed() {
+    if (!lotteryRound.winningEntry) {
+      return;
+    }
+
+    setLotteryRound((round) => ({
+      ...round,
+      prizeClaimStatus: 'claimed',
+    }));
   }
 
   function handlePurchase() {
@@ -1292,8 +1331,8 @@ export default function App() {
                   Chainlink handoff
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
-                  Close the active round when ticket sales end, then request winner selection. The next issue wires
-                  that request to Chainlink VRF.
+                  Close the active round when ticket sales end, then request Chainlink VRF winner selection from the
+                  closed artwork-ticket entries.
                 </p>
               </div>
             </div>
@@ -1322,7 +1361,7 @@ export default function App() {
                     </p>
                   </div>
                   <span className="rounded-full border border-[#24221f]/20 bg-white/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
-                    {lotteryRound.status === 'open' ? 'Open' : 'Closed'}
+                    {lotteryRound.status === 'fulfilled' ? 'VRF fulfilled' : lotteryRound.status === 'open' ? 'Open' : 'Closed'}
                   </span>
                 </div>
 
@@ -1332,8 +1371,10 @@ export default function App() {
                     ['Round pool', `$${currentRoundEntries.length}`],
                     [
                       'Winner request',
-                      lotteryRound.winnerRequest === 'requested'
-                        ? 'Requested'
+                      lotteryRound.winnerRequest === 'fulfilled'
+                        ? 'Fulfilled'
+                        : lotteryRound.winnerRequest === 'requested'
+                          ? 'Requested'
                         : lotteryRound.winnerRequest === 'ready'
                           ? 'Ready'
                           : 'Not ready',
@@ -1358,20 +1399,59 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleRequestLotteryWinner}
-                    disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest === 'requested'}
+                    disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest === 'fulfilled'}
                     className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Request winner
+                    Request VRF winner
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMarkPrizeClaimed}
+                    disabled={!lotteryRound.winningEntry || lotteryRound.prizeClaimStatus === 'claimed'}
+                    className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Mark claimed
                   </button>
                   <button
                     type="button"
                     onClick={handleOpenNextLotteryRound}
-                    disabled={lotteryRound.status === 'open' || lotteryRound.winnerRequest !== 'requested'}
+                    disabled={lotteryRound.status === 'open' || !lotteryRound.winningEntry}
                     className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     Open next round
                   </button>
                 </div>
+
+                {lotteryRound.vrfRequestId ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                        Chainlink VRF request
+                      </div>
+                      <div className="mt-2 font-mono text-xs uppercase tracking-wide">
+                        {lotteryRound.vrfRequestId}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-[#24221f]/70">
+                        Random word {lotteryRound.randomWord} selects entry #
+                        {Number(lotteryRound.winningEntry?.winningEntryIndex ?? 0) + 1}.
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                        Winning artwork ticket
+                      </div>
+                      <div className="mt-2 font-serif text-2xl text-[#2f350d]">
+                        #{String(lotteryRound.winningEntry?.ticketNumber ?? 0).padStart(3, '0')}{' '}
+                        {lotteryRound.winningEntry?.artTitle}
+                      </div>
+                      <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+                        Payout wallet {shortenAddress(lotteryRound.winningEntry?.payoutWallet ?? '')} · Prize{' '}
+                        ${closedRoundEntries.length || currentRoundEntries.length} ·{' '}
+                        {lotteryRound.prizeClaimStatus === 'claimed' ? 'Claimed' : 'Ready to claim'}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/50 p-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
                   {currentRoundEntries.length > 0
