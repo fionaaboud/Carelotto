@@ -8,6 +8,7 @@ Gate CareLotto participation with proof-of-human before a buyer can complete a r
 
 - Email signup enables the World ID verification step.
 - The buyer must complete the demo World ID step before the pay button unlocks.
+- The same proof can only be used for one receipt entry in the current demo round.
 - The receipt records whether World ID proof was present.
 - The ENS care profile shows whether the current participant is verified.
 
@@ -41,6 +42,7 @@ The lottery pool and care receipt mechanics break without human verification bec
 
 - [x] World verification is visible in checkout.
 - [x] Purchase is gated until proof-of-human is complete.
+- [x] Repeat entries with the same proof are blocked in the demo flow.
 - [x] Receipt/profile show World verification status.
 - [x] SDK handoff is documented.
 - [ ] Replace demo proof with IDKit.

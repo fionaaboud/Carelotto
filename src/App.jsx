@@ -230,7 +230,7 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
         <div className="mt-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[10px] uppercase tracking-wide">
           {lastPurchase
             ? `Purchase confirmed by ${lastPurchase.paymentMethod}. Split recorded.`
-            : `Payment: ${paymentMethod}. Complete signup to purchase.`}
+            : `Payment: ${paymentMethod}. Signup and proof-of-human required.`}
         </div>
         <Heart className="mx-auto mt-5 h-6 w-6 stroke-[#df8076]" />
       </div>
@@ -285,10 +285,28 @@ function CheckoutPanel({
   appEnsIdentity,
   paymentMethod,
   setPaymentMethod,
+  purchases,
   handlePurchase,
 }) {
   const isHumanVerified = worldVerification.status === 'verified';
-  const canPay = Boolean(selectedArt && buyerSession && isHumanVerified);
+  const hasUsedWorldProof = Boolean(
+    worldVerification.proofId && purchases.some((purchase) => purchase.worldProof === worldVerification.proofId),
+  );
+  const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof);
+  const participationStatus = !buyerSession
+    ? 'Email signup required'
+    : hasUsedWorldProof
+      ? 'Entry recorded'
+      : isHumanVerified
+        ? 'Human verified'
+        : 'World ID proof required';
+  const participationMessage = !buyerSession
+    ? 'Create the buyer session before requesting proof-of-human.'
+    : hasUsedWorldProof
+      ? 'This proof has already been used for the current lottery round.'
+      : isHumanVerified
+      ? 'This buyer can participate in the receipt lottery once.'
+      : 'World ID proof protects the lottery pool from duplicate or automated entries.';
   const ensDisplayName = ensIdentity?.displayName ?? (connectedWallet ? shortenAddress(connectedWallet.address) : null);
   const ensTextRecords = ensIdentity?.textRecords ?? {};
   const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
@@ -321,6 +339,27 @@ function CheckoutPanel({
             {label}
           </div>
         ))}
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#3f4513] text-[#f2ead9]">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <div className="font-mono text-xs uppercase tracking-wider">Human-gated participation</div>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[#24221f]/70">{participationMessage}</p>
+            </div>
+          </div>
+          <span
+            className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-wider ${
+              isHumanVerified ? 'border-[#3f4513] bg-white text-[#3f4513]' : 'border-[#24221f]/20 bg-[#f2ead9]/75'
+            }`}
+          >
+            {participationStatus}
+          </span>
+        </div>
       </div>
 
       <div className="mt-8">
@@ -427,7 +466,7 @@ function CheckoutPanel({
               {isHumanVerified ? 'Verified human' : 'One human, one receipt'}
             </div>
             <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
-              World ID protects the lottery pool from duplicate or automated participation.
+              World ID protects the lottery pool from duplicate or automated participation before payment unlocks.
             </p>
             <button
               type="button"
@@ -574,7 +613,12 @@ function CheckoutPanel({
         disabled={!canPay}
         className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
       >
-        {canPay ? 'Pay $3 and mint receipt' : 'Complete signup and World ID'} <ChevronRight className="ml-2 h-4 w-4" />
+        {canPay
+          ? 'Pay $3 and mint receipt'
+          : hasUsedWorldProof
+            ? 'Entry already recorded'
+            : 'Complete signup and World ID'}{' '}
+        <ChevronRight className="ml-2 h-4 w-4" />
       </button>
 
       <div className="mt-6 grid gap-3 font-mono text-xs uppercase tracking-wider sm:grid-cols-3">
@@ -899,7 +943,9 @@ export default function App() {
   }
 
   function handlePurchase() {
-    if (!buyerSession || worldVerification.status !== 'verified' || !selectedArt) {
+    const hasUsedWorldProof = purchases.some((purchase) => purchase.worldProof === worldVerification.proofId);
+
+    if (!buyerSession || worldVerification.status !== 'verified' || !selectedArt || hasUsedWorldProof) {
       return;
     }
 
@@ -1023,6 +1069,7 @@ export default function App() {
           appEnsIdentity={appEnsIdentity}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
+          purchases={purchases}
           handlePurchase={handlePurchase}
         />
 
