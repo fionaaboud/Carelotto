@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: theme('fontFamily.body');
+}
+
+button {
+  font: inherit;
+}
+
+.blueprint-grid {
+  background-image:
+    linear-gradient(rgba(121, 132, 95, 0.17) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(121, 132, 95, 0.17) 1px, transparent 1px),
+    linear-gradient(rgba(121, 132, 95, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(121, 132, 95, 0.08) 1px, transparent 1px);
+  background-position: -1px -1px;
+  background-size: 72px 72px, 72px 72px, 18px 18px, 18px 18px;
+}
+
+.creature-fuzz {
+  filter: drop-shadow(0 0 10px rgba(216, 182, 163, 0.8));
+}
+
+.creature-fuzz::before,
+.creature-fuzz::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 24% 18%, #ead1c5 0 5px, transparent 6px),
+    radial-gradient(circle at 76% 26%, #ead1c5 0 4px, transparent 5px),
+    radial-gradient(circle at 18% 70%, #c89f8e 0 5px, transparent 6px),
+    radial-gradient(circle at 86% 68%, #c89f8e 0 5px, transparent 6px);
+}
+
+.creature-fuzz::after {
+  inset: -12px;
+  opacity: 0.55;
+  transform: rotate(16deg);
+}
+
+.receipt-edge {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 12px),
+    94% 100%,
+    88% calc(100% - 12px),
+    82% 100%,
+    76% calc(100% - 12px),
+    70% 100%,
+    64% calc(100% - 12px),
+    58% 100%,
+    52% calc(100% - 12px),
+    46% 100%,
+    40% calc(100% - 12px),
+    34% 100%,
+    28% calc(100% - 12px),
+    22% 100%,
+    16% calc(100% - 12px),
+    10% 100%,
+    4% calc(100% - 12px),
+    0 100%
+  );
+}
+
+@media (max-width: 640px) {
+  .blueprint-grid {
+    background-size: 56px 56px, 56px 56px, 14px 14px, 14px 14px;
+  }
+}
