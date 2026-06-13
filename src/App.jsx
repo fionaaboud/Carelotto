@@ -161,9 +161,9 @@ function CareMachine({ plays, setPlays }) {
 
 function SplitDiagram() {
   const items = [
-    { icon: Palette, label: 'Project fund', text: 'Keeps the artwork alive.' },
-    { icon: Users, label: 'Community fund', text: 'Supports care initiatives.' },
-    { icon: Ticket, label: 'Weekly lotto', text: 'Creates direct support.' },
+    { icon: Palette, label: 'Artist wallet', text: 'Keeps the artwork alive.' },
+    { icon: Users, label: 'Social impact cause', text: 'Supports care initiatives.' },
+    { icon: Ticket, label: 'Lottery pool', text: 'Funds the Chainlink-selected winner.' },
   ];
 
   return (
@@ -187,12 +187,12 @@ function SplitDiagram() {
   );
 }
 
-function ReceiptPanel({ plays, selectedCause }) {
+function ReceiptPanel({ plays, selectedCause, split, lastPurchase }) {
   const rows = [
-    ['Play', `$${plays * 3}`],
-    ['Project', `$${plays}`],
-    ['Community', `$${plays}`],
-    ['Weekly pool', `$${plays}`],
+    ['Total paid', `$${split.total}`],
+    ['Artist wallet', `$${split.artist}`],
+    ['Social impact', `$${split.cause}`],
+    ['Lottery pool', `$${split.lottery}`],
   ];
 
   return (
@@ -202,10 +202,12 @@ function ReceiptPanel({ plays, selectedCause }) {
       </div>
       <div className="mx-auto max-w-xs border border-[#24221f]/25 bg-[#fff8ea] p-5 shadow-sm">
         <div className="text-center font-serif text-xl">CareLotto</div>
-        <div className="mt-2 text-center font-mono text-xs">06/03/2026 · 12:28</div>
+        <div className="mt-2 text-center font-mono text-xs">
+          {lastPurchase ? `TICKET ${String(lastPurchase.ticketNumber).padStart(3, '0')}` : 'READY TO PURCHASE'}
+        </div>
         <div className="my-5 h-32 rounded-sm border border-[#24221f]/20 bg-[radial-gradient(circle_at_30%_30%,#df8076,transparent_35%),linear-gradient(135deg,#efe0c4,#8da05a)]" />
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
-          Recipient: {selectedCause}
+          Cause: {selectedCause.name}
         </div>
         <div className="space-y-2 font-mono text-sm">
           {rows.map(([key, value]) => (
@@ -215,17 +217,20 @@ function ReceiptPanel({ plays, selectedCause }) {
             </div>
           ))}
         </div>
+        <div className="mt-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[10px] uppercase tracking-wide">
+          {lastPurchase ? 'Purchase confirmed. Split recorded.' : 'Choose a cause, then purchase an image.'}
+        </div>
         <Heart className="mx-auto mt-5 h-6 w-6 stroke-[#df8076]" />
       </div>
     </BlueprintFrame>
   );
 }
 
-function HeroMachineRender({ setPlays }) {
+function HeroMachineRender({ onPurchase }) {
   return (
     <motion.button
       type="button"
-      onClick={() => setPlays((count) => count + 1)}
+      onClick={onPurchase}
       initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7 }}
@@ -248,9 +253,41 @@ function HeroMachineRender({ setPlays }) {
 }
 
 export default function App() {
-  const [plays, setPlays] = useState(1);
-  const [selectedCause, setSelectedCause] = useState('Village Health Works');
-  const causes = ['Village Health Works', 'Local artist fund', 'Mutual aid pantry', 'Maternal care project'];
+  const ticketPrice = 3;
+  const causes = [
+    { name: 'Village Health Works', wallet: '0x8F...Care' },
+    { name: 'Local artist fund', wallet: '0x21...Arts' },
+    { name: 'Mutual aid pantry', wallet: '0x44...Food' },
+    { name: 'Maternal care project', wallet: '0x73...Moms' },
+  ];
+  const [plays, setPlays] = useState(0);
+  const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
+  const [lastPurchase, setLastPurchase] = useState(null);
+  const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
+  const split = useMemo(
+    () => ({
+      artist: plays,
+      cause: plays,
+      lottery: plays,
+      total: plays * ticketPrice,
+    }),
+    [plays],
+  );
+
+  function handlePurchase() {
+    setPlays((count) => {
+      const nextCount = count + 1;
+      setLastPurchase({
+        ticketNumber: nextCount,
+        cause: selectedCause.name,
+        total: ticketPrice,
+        artist: 1,
+        causeShare: 1,
+        lottery: 1,
+      });
+      return nextCount;
+    });
+  }
 
   return (
     <main
@@ -305,7 +342,7 @@ export default function App() {
             </a>
           </div>
         </div>
-        <HeroMachineRender setPlays={setPlays} />
+        <HeroMachineRender onPurchase={handlePurchase} />
       </section>
 
       <section id="how" className="mx-auto max-w-7xl px-6 py-16">
@@ -318,7 +355,7 @@ export default function App() {
               </h2>
               <p className="mt-5 leading-8 text-[#24221f]/75">
                 Each play touches society in three directions: project support, community initiatives, and a
-                weekly lotto pool. Luck becomes shared infrastructure.
+                weekly lottery pool. Luck becomes shared infrastructure.
               </p>
             </div>
             <SplitDiagram />
@@ -339,30 +376,39 @@ export default function App() {
             <label className="block">
               <span className="font-mono text-xs uppercase tracking-wider">Community recipient</span>
               <select
-                value={selectedCause}
-                onChange={(event) => setSelectedCause(event.target.value)}
+                value={selectedCauseName}
+                onChange={(event) => setSelectedCauseName(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-[#24221f]/25 bg-[#fff8ea] p-3"
               >
                 {causes.map((cause) => (
-                  <option key={cause}>{cause}</option>
+                  <option key={cause.name}>{cause.name}</option>
                 ))}
               </select>
             </label>
             <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
               <div className="font-mono text-xs uppercase tracking-wider">Selected care path</div>
-              <div className="mt-2 font-serif text-2xl">{selectedCause}</div>
+              <div className="mt-2 font-serif text-2xl">{selectedCause.name}</div>
+              <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+                Cause wallet {selectedCause.wallet}
+              </div>
             </div>
           </div>
 
           <button
-            onClick={() => setPlays((count) => count + 1)}
+            onClick={handlePurchase}
             className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 sm:w-auto"
           >
-            Add a $3 play <ChevronRight className="ml-2 h-4 w-4" />
+            Purchase image for $3 <ChevronRight className="ml-2 h-4 w-4" />
           </button>
+
+          <div className="mt-6 grid gap-3 font-mono text-xs uppercase tracking-wider sm:grid-cols-3">
+            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 artist</div>
+            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 cause</div>
+            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 lottery</div>
+          </div>
         </BlueprintFrame>
 
-        <ReceiptPanel plays={plays} selectedCause={selectedCause} />
+        <ReceiptPanel plays={plays} selectedCause={selectedCause} split={split} lastPurchase={lastPurchase} />
       </section>
 
       <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
