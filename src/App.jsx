@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { IDKitRequestWidget, proofOfHuman } from '@worldcoin/idkit';
 import {
   ArrowRight,
   ChevronRight,
@@ -15,6 +16,14 @@ import {
   Wallet,
 } from 'lucide-react';
 import { lookupEnsIdentity, lookupEnsName, shortenAddress } from './lib/ens';
+import {
+  fetchWorldRpContext,
+  getWorldProofId,
+  getWorldProofSignal,
+  isWorldConfigured,
+  verifyWorldProof,
+  worldConfig,
+} from './lib/worldId';
 
 const palette = {
   olive: '#3f4513',
@@ -282,6 +291,7 @@ function CheckoutPanel({
   handleBuyerSignup,
   worldVerification,
   handleWorldVerification,
+  isWorldRequestPending,
   connectedWallet,
   handleConnectWallet,
   ensIdentity,
@@ -466,7 +476,7 @@ function CheckoutPanel({
           </form>
           <div className="mt-4 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
             {buyerSession
-              ? `Session ready. Embedded wallet ${buyerSession.wallet}`
+              ? `Session ready. Embedded wallet ${shortenAddress(buyerSession.wallet)}`
               : 'Privy will create the buyer session and embedded wallet.'}
           </div>
         </div>
@@ -484,10 +494,10 @@ function CheckoutPanel({
             <button
               type="button"
               onClick={handleWorldVerification}
-              disabled={!buyerSession || isHumanVerified}
+              disabled={!buyerSession || isHumanVerified || isWorldRequestPending}
               className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-[#3f4513] px-5 py-3 font-mono text-xs uppercase tracking-wider text-[#f2ead9] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isHumanVerified ? 'Proof confirmed' : 'Verify with World ID'}
+              {isHumanVerified ? 'Proof confirmed' : isWorldRequestPending ? 'Opening World ID' : 'Verify with World ID'}
             </button>
             <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
               {buyerSession
@@ -829,6 +839,10 @@ export default function App() {
     message: 'World ID proof not started.',
     proofId: null,
   });
+  const [isWorldWidgetOpen, setIsWorldWidgetOpen] = useState(false);
+  const [worldRpContext, setWorldRpContext] = useState(null);
+  const [worldProofSignal, setWorldProofSignal] = useState(null);
+  const [isWorldRequestPending, setIsWorldRequestPending] = useState(false);
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [ensIdentity, setEnsIdentity] = useState(null);
   const [appEnsIdentity, setAppEnsIdentity] = useState(null);
@@ -945,17 +959,83 @@ export default function App() {
       message: 'Ready to request World ID proof.',
       proofId: null,
     });
+    setWorldRpContext(null);
+    setWorldProofSignal(null);
   }
 
-  function handleWorldVerification() {
+  async function handleWorldVerification() {
     if (!buyerSession) {
       return;
     }
 
+    if (!isWorldConfigured()) {
+      setWorldVerification({
+        status: 'configuration_needed',
+        message: 'Add VITE_WORLD_APP_ID and World verify server settings to enable real World ID.',
+        proofId: null,
+      });
+      return;
+    }
+
+    const signal = getWorldProofSignal({
+      wallet: buyerSession.wallet,
+      roundId: lotteryRound.id,
+    });
+
+    setIsWorldRequestPending(true);
+    setWorldVerification({
+      status: 'loading',
+      message: 'Preparing World ID proof request...',
+      proofId: null,
+    });
+
+    try {
+      const rpContext = await fetchWorldRpContext({ signal });
+
+      setWorldProofSignal(signal);
+      setWorldRpContext(rpContext);
+      setIsWorldWidgetOpen(true);
+      setWorldVerification({
+        status: 'ready',
+        message: 'World ID opened. Approve the proof in World App.',
+        proofId: null,
+      });
+    } catch (error) {
+      setWorldVerification({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Could not prepare World ID request.',
+        proofId: null,
+      });
+    } finally {
+      setIsWorldRequestPending(false);
+    }
+  }
+
+  async function handleWorldProofVerify(result) {
+    if (!worldProofSignal) {
+      throw new Error('Missing World proof signal.');
+    }
+
+    await verifyWorldProof({
+      result,
+      signal: worldProofSignal,
+    });
+  }
+
+  function handleWorldProofSuccess(result) {
+    setIsWorldWidgetOpen(false);
     setWorldVerification({
       status: 'verified',
-      message: 'Proof of human verified for this demo session.',
-      proofId: 'world-proof-demo-001',
+      message: 'World ID proof verified for this lottery round.',
+      proofId: getWorldProofId(result),
+    });
+  }
+
+  function handleWorldProofError(errorCode) {
+    setWorldVerification({
+      status: 'error',
+      message: `World ID verification failed: ${errorCode}`,
+      proofId: null,
     });
   }
 
@@ -1005,6 +1085,9 @@ export default function App() {
       message: buyerSession ? 'Ready to request World ID proof for the next round.' : 'World ID proof not started.',
       proofId: null,
     });
+    setWorldRpContext(null);
+    setWorldProofSignal(null);
+    setIsWorldWidgetOpen(false);
   }
 
   function handlePurchase() {
@@ -1057,6 +1140,22 @@ export default function App() {
         backgroundSize: '24px 24px',
       }}
     >
+      {worldConfig.appId && worldRpContext ? (
+        <IDKitRequestWidget
+          open={isWorldWidgetOpen}
+          onOpenChange={setIsWorldWidgetOpen}
+          app_id={worldConfig.appId}
+          action={worldConfig.action}
+          rp_context={worldRpContext}
+          allow_legacy_proofs
+          preset={proofOfHuman({ signal: worldProofSignal || undefined })}
+          handleVerify={handleWorldProofVerify}
+          onSuccess={handleWorldProofSuccess}
+          onError={handleWorldProofError}
+          autoClose
+        />
+      ) : null}
+
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 font-mono text-xs uppercase tracking-wider">
         <div className="flex items-center gap-2">
           <Heart className="h-4 w-4 fill-[#df8076] stroke-[#3f4513]" />
@@ -1138,6 +1237,7 @@ export default function App() {
           handleBuyerSignup={handleBuyerSignup}
           worldVerification={worldVerification}
           handleWorldVerification={handleWorldVerification}
+          isWorldRequestPending={isWorldRequestPending}
           connectedWallet={connectedWallet}
           handleConnectWallet={handleConnectWallet}
           ensIdentity={ensIdentity}

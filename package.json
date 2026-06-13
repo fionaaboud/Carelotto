@@ -10,9 +10,11 @@
     "check": "npm run build && npm run contracts:validate",
     "contracts:validate": "node scripts/validate-contracts.js",
     "contracts:compile": "hardhat compile",
-    "contracts:deploy:local": "hardhat run scripts/deploy-carelotto-split.js --network hardhatMainnet"
+    "contracts:deploy:local": "hardhat run scripts/deploy-carelotto-split.js --network hardhatMainnet",
+    "world:dev-server": "node scripts/world-id-dev-server.js"
   },
   "dependencies": {
+    "@worldcoin/idkit": "^4.1.8",
     "framer-motion": "^12.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

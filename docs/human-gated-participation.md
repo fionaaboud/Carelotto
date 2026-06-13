@@ -19,7 +19,7 @@ CareLotto combines art receipts, social impact funding, and a lottery pool. The 
 
 ## Final Integration Notes
 
-- Replace the demo proof with World ID IDKit.
+- Use World ID IDKit for proof-of-human.
 - Validate the proof in a backend or smart contract before recording participation.
 - Store a nullifier or proof identifier per round to prevent duplicate participation.
 - Keep the fallback UI clear when a user has not completed verification.
@@ -31,5 +31,7 @@ CareLotto combines art receipts, social impact funding, and a lottery pool. The 
 - [x] One proof maps to one receipt entry in the demo round.
 - [x] Repeat purchase attempts with the same proof are blocked.
 - [x] Receipt and profile show World proof status.
-- [ ] Replace demo proof with live IDKit.
-- [ ] Validate proof server-side or onchain.
+- [x] Replace demo proof click with live IDKit request flow.
+- [x] Validate proof through a backend endpoint before unlocking payment.
+- [ ] Add real World Developer Portal credentials.
+- [ ] Move verification endpoint to production infrastructure or onchain verification.
