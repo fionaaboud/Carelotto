@@ -8,6 +8,7 @@ contract CareLottoSplit {
     address public artistWallet;
     uint256 public totalImagesPurchased;
     uint256 public totalLotteryPool;
+    uint256 public currentRoundId;
 
     struct CauseStats {
         uint256 totalReceived;
@@ -15,7 +16,18 @@ contract CareLottoSplit {
         bool exists;
     }
 
+    struct LotteryRound {
+        uint256 id;
+        uint256 entryCount;
+        uint256 pool;
+        bool isOpen;
+        bool winnerRequested;
+        address winner;
+    }
+
     mapping(address => CauseStats) public causeStats;
+    mapping(uint256 => LotteryRound) public lotteryRounds;
+    mapping(uint256 => address[]) private lotteryRoundEntries;
 
     event ImagePurchased(
         address indexed purchaser,
@@ -28,6 +40,10 @@ contract CareLottoSplit {
     );
 
     event ArtistWalletUpdated(address indexed previousWallet, address indexed newWallet);
+    event LotteryRoundOpened(uint256 indexed roundId);
+    event LotteryEntryRecorded(uint256 indexed roundId, address indexed purchaser, uint256 lotteryShare);
+    event LotteryRoundClosed(uint256 indexed roundId, uint256 entryCount, uint256 pool);
+    event LotteryWinnerRequested(uint256 indexed roundId);
     event LotteryPrizeWithdrawn(address indexed winner, uint256 amount);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -36,6 +52,8 @@ contract CareLottoSplit {
     error TransferFailed();
     error Unauthorized();
     error InsufficientLotteryPool();
+    error LotteryRoundClosed();
+    error LotteryRoundStillOpen();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
@@ -47,20 +65,36 @@ contract CareLottoSplit {
 
         owner = msg.sender;
         artistWallet = initialArtistWallet;
+        currentRoundId = 1;
+        lotteryRounds[currentRoundId] = LotteryRound({
+            id: currentRoundId,
+            entryCount: 0,
+            pool: 0,
+            isOpen: true,
+            winnerRequested: false,
+            winner: address(0)
+        });
 
         emit OwnershipTransferred(address(0), msg.sender);
+        emit LotteryRoundOpened(currentRoundId);
     }
 
-    function purchaseImage(address socialImpactCause, bytes32 imageId) external payable {
+    function purchaseImage(address buyerWallet, address socialImpactCause, bytes32 imageId) external payable {
         if (msg.value == 0) revert InvalidPayment();
+        if (buyerWallet == address(0)) revert InvalidAddress();
         if (socialImpactCause == address(0)) revert InvalidAddress();
+        if (!lotteryRounds[currentRoundId].isOpen) revert LotteryRoundClosed();
 
         uint256 artistShare = msg.value / 3;
         uint256 causeShare = msg.value / 3;
         uint256 lotteryShare = msg.value - artistShare - causeShare;
+        LotteryRound storage round = lotteryRounds[currentRoundId];
 
         totalImagesPurchased += 1;
         totalLotteryPool += lotteryShare;
+        round.entryCount += 1;
+        round.pool += lotteryShare;
+        lotteryRoundEntries[currentRoundId].push(buyerWallet);
 
         CauseStats storage stats = causeStats[socialImpactCause];
         stats.totalReceived += causeShare;
@@ -71,7 +105,7 @@ contract CareLottoSplit {
         _sendValue(socialImpactCause, causeShare);
 
         emit ImagePurchased(
-            msg.sender,
+            buyerWallet,
             imageId,
             socialImpactCause,
             msg.value,
@@ -79,6 +113,49 @@ contract CareLottoSplit {
             causeShare,
             lotteryShare
         );
+        emit LotteryEntryRecorded(currentRoundId, buyerWallet, lotteryShare);
+    }
+
+    function closeCurrentLotteryRound() external onlyOwner {
+        LotteryRound storage round = lotteryRounds[currentRoundId];
+        if (!round.isOpen) revert LotteryRoundClosed();
+
+        round.isOpen = false;
+
+        emit LotteryRoundClosed(currentRoundId, round.entryCount, round.pool);
+    }
+
+    function requestLotteryWinner() external onlyOwner {
+        LotteryRound storage round = lotteryRounds[currentRoundId];
+        if (round.isOpen) revert LotteryRoundStillOpen();
+
+        round.winnerRequested = true;
+
+        emit LotteryWinnerRequested(currentRoundId);
+    }
+
+    function openNextLotteryRound() external onlyOwner {
+        if (lotteryRounds[currentRoundId].isOpen) revert LotteryRoundStillOpen();
+
+        currentRoundId += 1;
+        lotteryRounds[currentRoundId] = LotteryRound({
+            id: currentRoundId,
+            entryCount: 0,
+            pool: 0,
+            isOpen: true,
+            winnerRequested: false,
+            winner: address(0)
+        });
+
+        emit LotteryRoundOpened(currentRoundId);
+    }
+
+    function getLotteryRoundEntry(uint256 roundId, uint256 index) external view returns (address) {
+        return lotteryRoundEntries[roundId][index];
+    }
+
+    function getLotteryRoundEntryCount(uint256 roundId) external view returns (uint256) {
+        return lotteryRoundEntries[roundId].length;
     }
 
     function setArtistWallet(address newArtistWallet) external onlyOwner {

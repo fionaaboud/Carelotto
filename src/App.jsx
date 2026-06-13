@@ -191,7 +191,7 @@ function SplitDiagram() {
   );
 }
 
-function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod, worldVerification }) {
+function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod, worldVerification, lotteryRound }) {
   const rows = [
     ['Total paid', `$${split.total}`],
     ['Artist wallet', `$${split.artist}`],
@@ -218,6 +218,9 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
         </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
           Human proof: {worldVerification.status === 'verified' ? 'World ID verified' : 'Pending'}
+        </div>
+        <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
+          Lottery round: #{lastPurchase?.roundId ?? lotteryRound.id}
         </div>
         <div className="space-y-2 font-mono text-sm">
           {rows.map(([key, value]) => (
@@ -286,21 +289,28 @@ function CheckoutPanel({
   paymentMethod,
   setPaymentMethod,
   purchases,
+  lotteryRound,
   handlePurchase,
 }) {
   const isHumanVerified = worldVerification.status === 'verified';
+  const isRoundOpen = lotteryRound.status === 'open';
   const hasUsedWorldProof = Boolean(
-    worldVerification.proofId && purchases.some((purchase) => purchase.worldProof === worldVerification.proofId),
+    worldVerification.proofId &&
+      purchases.some((purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id),
   );
-  const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof);
-  const participationStatus = !buyerSession
+  const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof && isRoundOpen);
+  const participationStatus = !isRoundOpen
+    ? 'Round closed'
+    : !buyerSession
     ? 'Email signup required'
     : hasUsedWorldProof
       ? 'Entry recorded'
       : isHumanVerified
         ? 'Human verified'
         : 'World ID proof required';
-  const participationMessage = !buyerSession
+  const participationMessage = !isRoundOpen
+    ? 'This lottery round is closed and ready for Chainlink winner selection.'
+    : !buyerSession
     ? 'Create the buyer session before requesting proof-of-human.'
     : hasUsedWorldProof
       ? 'This proof has already been used for the current lottery round.'
@@ -347,10 +357,13 @@ function CheckoutPanel({
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#3f4513] text-[#f2ead9]">
               <ShieldCheck className="h-5 w-5" />
             </span>
-            <div>
-              <div className="font-mono text-xs uppercase tracking-wider">Human-gated participation</div>
+          <div>
+            <div className="font-mono text-xs uppercase tracking-wider">Human-gated participation</div>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[#24221f]/70">{participationMessage}</p>
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+              Active lottery round #{lotteryRound.id}
             </div>
+          </div>
           </div>
           <span
             className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-wider ${
@@ -541,7 +554,7 @@ function CheckoutPanel({
         <div className="mt-3 grid gap-3 font-mono text-[10px] uppercase tracking-wide md:grid-cols-3">
           <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
             <div className="text-[#24221f]/55">Privy embedded wallet</div>
-            <div className="mt-2">{buyerSession?.wallet ?? 'Created after email signup'}</div>
+            <div className="mt-2">{buyerSession ? shortenAddress(buyerSession.wallet) : 'Created after email signup'}</div>
           </div>
           <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
             <div className="text-[#24221f]/55">External crypto wallet</div>
@@ -615,7 +628,9 @@ function CheckoutPanel({
       >
         {canPay
           ? 'Pay $3 and mint receipt'
-          : hasUsedWorldProof
+          : !isRoundOpen
+            ? 'Round closed'
+            : hasUsedWorldProof
             ? 'Entry already recorded'
             : 'Complete signup and World ID'}{' '}
         <ChevronRight className="ml-2 h-4 w-4" />
@@ -644,7 +659,7 @@ function CareProfile({
   const displayName =
     ensIdentity?.displayName ??
     (connectedWallet ? shortenAddress(connectedWallet.address) : null) ??
-    buyerSession?.wallet ??
+    (buyerSession ? shortenAddress(buyerSession.wallet) : null) ??
     'Connect to build profile';
   const latestPurchase = purchases[purchases.length - 1];
   const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
@@ -820,8 +835,17 @@ export default function App() {
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
   const [purchases, setPurchases] = useState([]);
+  const [lotteryRound, setLotteryRound] = useState({
+    id: 1,
+    status: 'open',
+    winnerRequest: 'not_requested',
+  });
   const selectedArt = artOptions.find((art) => art.id === selectedArtId) ?? artOptions[0];
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
+  const currentRoundEntries = useMemo(
+    () => purchases.filter((purchase) => purchase.roundId === lotteryRound.id),
+    [lotteryRound.id, purchases],
+  );
   const split = useMemo(
     () => ({
       artist: plays,
@@ -913,7 +937,7 @@ export default function App() {
 
     setBuyerSession({
       email: buyerEmail,
-      wallet: shortenAddress(import.meta.env.VITE_DEMO_EMBEDDED_WALLET || '0x9a2c4d4f8f0c8f1c6a7a4f4e6f5b4c3d2e1a0b9c'),
+      wallet: import.meta.env.VITE_DEMO_EMBEDDED_WALLET || '0x9a2c4d4f8f0c8f1c6a7a4f4e6f5b4c3d2e1a0b9c',
     });
 
     setWorldVerification({
@@ -942,10 +966,59 @@ export default function App() {
     });
   }
 
-  function handlePurchase() {
-    const hasUsedWorldProof = purchases.some((purchase) => purchase.worldProof === worldVerification.proofId);
+  function handleCloseLotteryRound() {
+    if (lotteryRound.status !== 'open') {
+      return;
+    }
 
-    if (!buyerSession || worldVerification.status !== 'verified' || !selectedArt || hasUsedWorldProof) {
+    setLotteryRound((round) => ({
+      ...round,
+      status: 'closed',
+      winnerRequest: 'ready',
+    }));
+  }
+
+  function handleRequestLotteryWinner() {
+    if (lotteryRound.status !== 'closed') {
+      return;
+    }
+
+    setLotteryRound((round) => ({
+      ...round,
+      winnerRequest: 'requested',
+    }));
+  }
+
+  function handleOpenNextLotteryRound() {
+    if (lotteryRound.status === 'open') {
+      return;
+    }
+
+    setLotteryRound((round) => ({
+      id: round.id + 1,
+      status: 'open',
+      winnerRequest: 'not_requested',
+    }));
+
+    setWorldVerification({
+      status: buyerSession ? 'ready' : 'not_started',
+      message: buyerSession ? 'Ready to request World ID proof for the next round.' : 'World ID proof not started.',
+      proofId: null,
+    });
+  }
+
+  function handlePurchase() {
+    const hasUsedWorldProof = purchases.some(
+      (purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id,
+    );
+
+    if (
+      !buyerSession ||
+      worldVerification.status !== 'verified' ||
+      !selectedArt ||
+      hasUsedWorldProof ||
+      lotteryRound.status !== 'open'
+    ) {
       return;
     }
 
@@ -953,6 +1026,8 @@ export default function App() {
       const nextCount = count + 1;
       const purchase = {
         ticketNumber: nextCount,
+        roundId: lotteryRound.id,
+        payoutWallet: buyerSession.wallet,
         artId: selectedArt.id,
         artTitle: selectedArt.title,
         buyerEmail: buyerSession.email,
@@ -1070,6 +1145,7 @@ export default function App() {
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           purchases={purchases}
+          lotteryRound={lotteryRound}
           handlePurchase={handlePurchase}
         />
 
@@ -1081,6 +1157,7 @@ export default function App() {
           selectedArt={selectedArt}
           paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
           worldVerification={worldVerification}
+          lotteryRound={lotteryRound}
         />
       </section>
 
@@ -1108,8 +1185,17 @@ export default function App() {
               </h2>
               <p className="mt-4 leading-8 text-[#24221f]/75">
                 The dashboard mirrors the contract split so judges can see how artist funding, cause support, and
-                the lottery pool move together.
+                the lottery pool move together across each managed round.
               </p>
+              <div className="mt-5 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                  Chainlink handoff
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
+                  Close the active round when ticket sales end, then request winner selection. The next issue wires
+                  that request to Chainlink VRF.
+                </p>
+              </div>
             </div>
             <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-4">
@@ -1124,6 +1210,81 @@ export default function App() {
                     <div className="mt-2 font-serif text-3xl text-[#2f350d]">{value}</div>
                   </div>
                 ))}
+              </div>
+
+              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="font-mono text-xs uppercase tracking-wider">Lottery round management</div>
+                    <div className="mt-2 font-serif text-3xl text-[#2f350d]">Round #{lotteryRound.id}</div>
+                    <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
+                      Entries and pool totals are isolated by round so Chainlink can select from a closed entry set.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-[#24221f]/20 bg-white/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
+                    {lotteryRound.status === 'open' ? 'Open' : 'Closed'}
+                  </span>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ['Round entries', currentRoundEntries.length],
+                    ['Round pool', `$${currentRoundEntries.length}`],
+                    [
+                      'Winner request',
+                      lotteryRound.winnerRequest === 'requested'
+                        ? 'Requested'
+                        : lotteryRound.winnerRequest === 'ready'
+                          ? 'Ready'
+                          : 'Not ready',
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                      <div className="mt-2 font-serif text-2xl text-[#2f350d]">{value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleCloseLotteryRound}
+                    disabled={lotteryRound.status !== 'open' || currentRoundEntries.length === 0}
+                    className="rounded-xl bg-[#3f4513] px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-[#f2ead9] disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Close round
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRequestLotteryWinner}
+                    disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest === 'requested'}
+                    className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Request winner
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenNextLotteryRound}
+                    disabled={lotteryRound.status === 'open' || lotteryRound.winnerRequest !== 'requested'}
+                    className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Open next round
+                  </button>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/50 p-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+                  {currentRoundEntries.length > 0
+                    ? currentRoundEntries
+                        .map(
+                          (entry) =>
+                            `#${String(entry.ticketNumber).padStart(3, '0')} ${entry.artTitle} -> ${shortenAddress(
+                              entry.payoutWallet,
+                            )}`,
+                        )
+                        .join(' / ')
+                    : 'No entries in this round yet.'}
+                </div>
               </div>
 
               <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">

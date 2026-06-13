@@ -7,8 +7,10 @@
 - One third of each image purchase goes to the artist wallet.
 - One third goes to the selected social impact cause wallet.
 - The remaining third stays in the contract lottery pool.
+- Each artwork purchase is also recorded as a lottery ticket entry in the active round.
+- The entry records the buyer payout wallet, so Privy/card flows can still pay the eventual winner.
 
-The lottery pool is held for the Chainlink VRF milestone, where winner selection will be added.
+The lottery pool is held for the Chainlink VRF milestone. Round management is now in place so an operator can close the active round, request winner selection, and open the next round after the request.
 
 ## Local Compile
 
