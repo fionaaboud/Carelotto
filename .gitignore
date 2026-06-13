@@ -1,4 +1,35 @@
-node_modules
-dist
-.npm-cache
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Caches
+.npm-cache/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# OS/editor files
 .DS_Store
+.vscode-test/
+
+# Package output
+*.tgz
