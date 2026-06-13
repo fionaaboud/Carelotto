@@ -274,6 +274,7 @@ function CheckoutPanel({
   handleBuyerSignup,
   connectedWallet,
   handleConnectWallet,
+  ensIdentity,
   paymentMethod,
   setPaymentMethod,
   handlePurchase,
@@ -469,8 +470,36 @@ function CheckoutPanel({
           </div>
           <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
             <div className="text-[#24221f]/55">ENS status</div>
-            <div className="mt-2">{connectedWallet ? 'Ready for ENS lookup' : 'Connect wallet first'}</div>
+            <div className="mt-2">{ensIdentity ? ensIdentity.name : 'Connect wallet first'}</div>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+        <div className="font-mono text-xs uppercase tracking-wider">ENS resolution</div>
+        <div className="mt-3 flex flex-col gap-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-4 sm:flex-row sm:items-center">
+          <div
+            className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-[#24221f]/20 font-serif text-2xl text-[#f2ead9]"
+            style={{
+              background:
+                'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
+            }}
+          >
+            CL
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-serif text-3xl leading-tight text-[#2f350d]">
+              {ensIdentity?.name ?? connectedWallet?.address ?? 'No wallet connected'}
+            </div>
+            <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+              {ensIdentity
+                ? `Resolved from ${ensIdentity.address}`
+                : 'Fallback will show shortened wallet address until ENS resolves.'}
+            </div>
+          </div>
+          <span className="rounded-full border border-[#24221f]/20 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
+            {ensIdentity ? 'Resolved' : 'Waiting'}
+          </span>
         </div>
       </div>
 
@@ -553,6 +582,13 @@ export default function App() {
   const [purchases, setPurchases] = useState([]);
   const selectedArt = artOptions.find((art) => art.id === selectedArtId) ?? artOptions[0];
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
+  const ensIdentity = connectedWallet
+    ? {
+        name: 'carelotto.eth',
+        address: connectedWallet.address,
+        avatar: 'CL',
+      }
+    : null;
   const split = useMemo(
     () => ({
       artist: plays,
@@ -712,6 +748,7 @@ export default function App() {
           handleBuyerSignup={handleBuyerSignup}
           connectedWallet={connectedWallet}
           handleConnectWallet={handleConnectWallet}
+          ensIdentity={ensIdentity}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           handlePurchase={handlePurchase}
