@@ -342,10 +342,30 @@ function AuthPanel() {
 export default function App() {
   const ticketPrice = 3;
   const causes = [
-    { name: 'Village Health Works', wallet: '0x8F...Care' },
-    { name: 'Local artist fund', wallet: '0x21...Arts' },
-    { name: 'Mutual aid pantry', wallet: '0x44...Food' },
-    { name: 'Maternal care project', wallet: '0x73...Moms' },
+    {
+      name: 'Village Health Works',
+      wallet: '0x8F...Care',
+      category: 'Clinic care',
+      description: 'Funds community health visits and patient support.',
+    },
+    {
+      name: 'Local artist fund',
+      wallet: '0x21...Arts',
+      category: 'Creative work',
+      description: 'Supports artists producing CareLotto receipt artwork.',
+    },
+    {
+      name: 'Mutual aid pantry',
+      wallet: '0x44...Food',
+      category: 'Food access',
+      description: 'Helps stock weekly pantry drops and essentials.',
+    },
+    {
+      name: 'Maternal care project',
+      wallet: '0x73...Moms',
+      category: 'Family support',
+      description: 'Backs care kits and transport for maternal visits.',
+    },
   ];
   const [plays, setPlays] = useState(0);
   const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
@@ -460,25 +480,44 @@ export default function App() {
             and watch the receipt and impact split update.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="font-mono text-xs uppercase tracking-wider">Community recipient</span>
-              <select
-                value={selectedCauseName}
-                onChange={(event) => setSelectedCauseName(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-[#24221f]/25 bg-[#fff8ea] p-3"
-              >
-                {causes.map((cause) => (
-                  <option key={cause.name}>{cause.name}</option>
-                ))}
-              </select>
-            </label>
-            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-              <div className="font-mono text-xs uppercase tracking-wider">Selected care path</div>
-              <div className="mt-2 font-serif text-2xl">{selectedCause.name}</div>
-              <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-                Cause wallet {selectedCause.wallet}
-              </div>
+          <div className="mt-8">
+            <div className="mb-3 font-mono text-xs uppercase tracking-wider">Choose social impact cause</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {causes.map((cause) => {
+                const isSelected = selectedCause.name === cause.name;
+
+                return (
+                  <button
+                    key={cause.name}
+                    type="button"
+                    onClick={() => setSelectedCauseName(cause.name)}
+                    className={`min-h-36 rounded-2xl border p-4 text-left transition ${
+                      isSelected
+                        ? 'border-[#3f4513] bg-[#fff8ea] shadow-[0_10px_30px_rgba(63,69,19,.14)]'
+                        : 'border-[#24221f]/20 bg-[#fff8ea]/60 hover:bg-[#fff8ea]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#3f4513]">
+                          {cause.category}
+                        </div>
+                        <div className="mt-2 font-serif text-2xl leading-tight">{cause.name}</div>
+                      </div>
+                      <span
+                        className={`mt-1 h-4 w-4 rounded-full border ${
+                          isSelected ? 'border-[#3f4513] bg-[#df8076]' : 'border-[#24221f]/30'
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[#24221f]/70">{cause.description}</p>
+                    <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+                      {cause.wallet}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
