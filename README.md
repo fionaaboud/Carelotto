@@ -4,6 +4,10 @@ CareLotto is a participatory social sculpture that transforms chance into collec
 
 This repository currently contains a Vite + React prototype homepage for CareLotto, styled with Tailwind CSS and animated with Framer Motion.
 
+## Hackathon Scope
+
+The current app is frontend-first. Backend, smart contract, ENS, World, Chainlink, and Privy work should be added issue-by-issue so each feature can be reviewed in a focused pull request.
+
 ## Overview
 
 Every play contributes to three outcomes:
@@ -21,6 +25,17 @@ Participants receive an artwork-style receipt documenting their contribution. Th
 - Tailwind CSS
 - Framer Motion
 - Lucide React icons
+
+## Project Structure
+
+```text
+src/
+  App.jsx        Main prototype experience
+  main.jsx       React entry point
+  styles.css     Tailwind and global styles
+public/
+  carelotto-machine-draft*.png
+```
 
 ## Setup
 
@@ -41,6 +56,16 @@ Create a production build:
 ```bash
 npm run build
 ```
+
+Run the project check:
+
+```bash
+npm run check
+```
+
+## Environment
+
+Copy `.env.example` to `.env` when a feature needs local environment variables. The project does not require environment variables for the current frontend prototype.
 
 ## Vision
 
