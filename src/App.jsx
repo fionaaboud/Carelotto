@@ -252,6 +252,93 @@ function HeroMachineRender({ onPurchase }) {
   );
 }
 
+function AuthPanel() {
+  const [email, setEmail] = useState('');
+  const [session, setSession] = useState(null);
+  const privyConfigured = Boolean(import.meta.env.VITE_PRIVY_APP_ID);
+
+  function handleEmailSignup(event) {
+    event.preventDefault();
+
+    if (!email.trim()) {
+      return;
+    }
+
+    setSession({
+      email,
+      wallet: '0x9A...Care',
+      ensProfile: 'pending ENS profile',
+    });
+  }
+
+  return (
+    <BlueprintFrame className="p-6 md:p-8">
+      <div className="font-mono text-xs uppercase tracking-wider">Privy authentication</div>
+      <div className="mt-3 grid gap-6 lg:grid-cols-[.85fr_1fr]">
+        <div>
+          <h2 className="font-serif text-4xl leading-tight text-[#2f350d] md:text-5xl">
+            Sign in before the ticket becomes yours.
+          </h2>
+          <p className="mt-4 leading-8 text-[#24221f]/75">
+            Email signup will create a user session, attach an embedded wallet, and prepare the wallet identity for
+            ENS profile resolution.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/75 p-5">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="font-mono text-xs uppercase tracking-wider">Session state</div>
+            <span className="rounded-full border border-[#24221f]/20 px-3 py-1 font-mono text-[10px] uppercase tracking-wider">
+              {privyConfigured ? 'Privy ready' : 'Demo mode'}
+            </span>
+          </div>
+
+          <form onSubmit={handleEmailSignup} className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="email@example.com"
+              className="min-h-12 rounded-xl border border-[#24221f]/25 bg-white px-4"
+            />
+            <button
+              type="submit"
+              className="min-h-12 rounded-xl bg-[#3f4513] px-5 font-mono text-xs uppercase tracking-wider text-[#f2ead9]"
+            >
+              Sign up
+            </button>
+          </form>
+
+          <div className="mt-5 grid gap-3 font-mono text-xs uppercase tracking-wider">
+            <div className="flex justify-between border-b border-[#24221f]/10 pb-2">
+              <span>Email</span>
+              <span>{session?.email ?? 'Not signed in'}</span>
+            </div>
+            <div className="flex justify-between border-b border-[#24221f]/10 pb-2">
+              <span>Embedded wallet</span>
+              <span>{session?.wallet ?? 'Created after signup'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>ENS profile</span>
+              <span>{session?.ensProfile ?? 'Connect wallet first'}</span>
+            </div>
+          </div>
+
+          {session && (
+            <button
+              type="button"
+              onClick={() => setSession(null)}
+              className="mt-5 w-full rounded-xl border border-[#24221f]/20 px-5 py-3 font-mono text-xs uppercase tracking-wider"
+            >
+              Sign out
+            </button>
+          )}
+        </div>
+      </div>
+    </BlueprintFrame>
+  );
+}
+
 export default function App() {
   const ticketPrice = 3;
   const causes = [
@@ -307,6 +394,7 @@ export default function App() {
         <div className="hidden gap-6 md:flex">
           <a href="#how">How it works</a>
           <a href="#impact">Impact</a>
+          <a href="#auth">Auth</a>
           <a href="#play">Play</a>
         </div>
         <a href="#play" className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5">
@@ -409,6 +497,10 @@ export default function App() {
         </BlueprintFrame>
 
         <ReceiptPanel plays={plays} selectedCause={selectedCause} split={split} lastPurchase={lastPurchase} />
+      </section>
+
+      <section id="auth" className="mx-auto max-w-7xl px-6 py-16">
+        <AuthPanel />
       </section>
 
       <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
