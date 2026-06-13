@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowRight,
   ChevronRight,
+  CreditCard,
   Gift,
   Heart,
   Palette,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Ticket,
   Users,
+  Wallet,
 } from 'lucide-react';
 
 const palette = {
@@ -187,7 +189,7 @@ function SplitDiagram() {
   );
 }
 
-function ReceiptPanel({ plays, selectedCause, split, lastPurchase }) {
+function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod }) {
   const rows = [
     ['Total paid', `$${split.total}`],
     ['Artist wallet', `$${split.artist}`],
@@ -206,6 +208,9 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase }) {
           {lastPurchase ? `TICKET ${String(lastPurchase.ticketNumber).padStart(3, '0')}` : 'READY TO PURCHASE'}
         </div>
         <div className="my-5 h-32 rounded-sm border border-[#24221f]/20 bg-[radial-gradient(circle_at_30%_30%,#df8076,transparent_35%),linear-gradient(135deg,#efe0c4,#8da05a)]" />
+        <div className="mb-3 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
+          Artwork: {lastPurchase?.artTitle ?? selectedArt?.title ?? 'Choose art'}
+        </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
           Cause: {selectedCause.name}
         </div>
@@ -218,7 +223,9 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase }) {
           ))}
         </div>
         <div className="mt-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[10px] uppercase tracking-wide">
-          {lastPurchase ? 'Purchase confirmed. Split recorded.' : 'Choose a cause, then purchase an image.'}
+          {lastPurchase
+            ? `Purchase confirmed by ${lastPurchase.paymentMethod}. Split recorded.`
+            : `Payment: ${paymentMethod}. Complete signup to purchase.`}
         </div>
         <Heart className="mx-auto mt-5 h-6 w-6 stroke-[#df8076]" />
       </div>
@@ -226,16 +233,16 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase }) {
   );
 }
 
-function HeroMachineRender({ onPurchase }) {
+function HeroMachineRender({ onHeartClick }) {
   return (
     <motion.button
       type="button"
-      onClick={onPurchase}
+      onClick={onHeartClick}
       initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7 }}
       className="group relative mx-auto block w-full max-w-[520px] focus:outline-none"
-      aria-label="Press the rendered CareLotto machine"
+      aria-label="Press the rendered CareLotto machine heart"
     >
       <div className="absolute -inset-4 rounded-[2.5rem] border border-[#24221f]/20 bg-[#f2ead9]/55 shadow-2xl transition group-hover:-translate-y-1" />
       <div className="relative overflow-hidden rounded-[2rem] border border-[#24221f]/25 bg-[#efe5d1] shadow-[0_32px_70px_rgba(20,18,9,.22)]">
@@ -246,58 +253,140 @@ function HeroMachineRender({ onPurchase }) {
         />
       </div>
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-[#24221f]/20 bg-[#f8efd9]/90 px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-[#24221f] shadow-sm backdrop-blur">
-        Draft render preview
+        Press heart to choose art
       </div>
     </motion.button>
   );
 }
 
-function AuthPanel() {
-  const [email, setEmail] = useState('');
-  const [session, setSession] = useState(null);
-  const privyConfigured = Boolean(import.meta.env.VITE_PRIVY_APP_ID);
-
-  function handleEmailSignup(event) {
-    event.preventDefault();
-
-    if (!email.trim()) {
-      return;
-    }
-
-    setSession({
-      email,
-      wallet: '0x9A...Care',
-      ensProfile: 'pending ENS profile',
-    });
-  }
+function CheckoutPanel({
+  artOptions,
+  selectedArt,
+  selectedArtId,
+  setSelectedArtId,
+  causes,
+  selectedCause,
+  selectedCauseName,
+  setSelectedCauseName,
+  buyerEmail,
+  setBuyerEmail,
+  buyerSession,
+  handleBuyerSignup,
+  paymentMethod,
+  setPaymentMethod,
+  handlePurchase,
+}) {
+  const canPay = Boolean(selectedArt && buyerSession);
 
   return (
     <BlueprintFrame className="p-6 md:p-8">
-      <div className="font-mono text-xs uppercase tracking-wider">Privy authentication</div>
-      <div className="mt-3 grid gap-6 lg:grid-cols-[.85fr_1fr]">
-        <div>
-          <h2 className="font-serif text-4xl leading-tight text-[#2f350d] md:text-5xl">
-            Sign in before the ticket becomes yours.
-          </h2>
-          <p className="mt-4 leading-8 text-[#24221f]/75">
-            Email signup will create a user session, attach an embedded wallet, and prepare the wallet identity for
-            ENS profile resolution.
-          </p>
-        </div>
+      <div className="font-mono text-xs uppercase tracking-wider">Checkout flow</div>
+      <h2 className="mt-3 font-serif text-4xl text-[#2f350d] md:text-5xl">Press heart. Choose art. Pay your way.</h2>
+      <p className="mt-4 max-w-2xl leading-8 text-[#24221f]/75">
+        The buyer starts with the heart, selects a receipt artwork, signs up with email through the Privy-ready
+        flow, then pays by credit card or crypto.
+      </p>
 
-        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/75 p-5">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <div className="font-mono text-xs uppercase tracking-wider">Session state</div>
-            <span className="rounded-full border border-[#24221f]/20 px-3 py-1 font-mono text-[10px] uppercase tracking-wider">
-              {privyConfigured ? 'Privy ready' : 'Demo mode'}
+      <div className="mt-8 grid gap-3 font-mono text-[10px] uppercase tracking-wider sm:grid-cols-4">
+        {[
+          ['1', 'Choose art', selectedArt],
+          ['2', 'Email signup', buyerSession],
+          ['3', 'Payment', paymentMethod],
+          ['4', 'Receipt', canPay],
+        ].map(([number, label, active]) => (
+          <div
+            key={label}
+            className={`rounded-xl border p-3 ${
+              active ? 'border-[#3f4513] bg-[#fff8ea]' : 'border-[#24221f]/15 bg-[#fff8ea]/45'
+            }`}
+          >
+            <span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-[#3f4513] text-[#f2ead9]">
+              {number}
             </span>
+            {label}
           </div>
+        ))}
+      </div>
 
-          <form onSubmit={handleEmailSignup} className="grid gap-3 sm:grid-cols-[1fr_auto]">
+      <div className="mt-8">
+        <div className="mb-3 font-mono text-xs uppercase tracking-wider">Choose receipt artwork</div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {artOptions.map((art) => {
+            const isSelected = selectedArtId === art.id;
+
+            return (
+              <button
+                key={art.id}
+                type="button"
+                onClick={() => setSelectedArtId(art.id)}
+                className={`rounded-2xl border p-3 text-left transition ${
+                  isSelected
+                    ? 'border-[#3f4513] bg-[#fff8ea] shadow-[0_10px_30px_rgba(63,69,19,.14)]'
+                    : 'border-[#24221f]/20 bg-[#fff8ea]/60 hover:bg-[#fff8ea]'
+                }`}
+              >
+                <div
+                  className="h-32 rounded-xl border border-[#24221f]/15"
+                  style={{ background: art.background }}
+                  aria-hidden="true"
+                />
+                <div className="mt-3 font-serif text-2xl">{art.title}</div>
+                <p className="mt-1 text-sm leading-6 text-[#24221f]/70">{art.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <div className="mb-3 font-mono text-xs uppercase tracking-wider">Choose social impact cause</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {causes.map((cause) => {
+            const isSelected = selectedCause.name === cause.name;
+
+            return (
+              <button
+                key={cause.name}
+                type="button"
+                onClick={() => setSelectedCauseName(cause.name)}
+                className={`min-h-36 rounded-2xl border p-4 text-left transition ${
+                  isSelected
+                    ? 'border-[#3f4513] bg-[#fff8ea] shadow-[0_10px_30px_rgba(63,69,19,.14)]'
+                    : 'border-[#24221f]/20 bg-[#fff8ea]/60 hover:bg-[#fff8ea]'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#3f4513]">
+                      {cause.category}
+                    </div>
+                    <div className="mt-2 font-serif text-2xl leading-tight">{cause.name}</div>
+                  </div>
+                  <span
+                    className={`mt-1 h-4 w-4 rounded-full border ${
+                      isSelected ? 'border-[#3f4513] bg-[#df8076]' : 'border-[#24221f]/30'
+                    }`}
+                    aria-hidden="true"
+                  />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[#24221f]/70">{cause.description}</p>
+                <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+                  {cause.wallet}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_.9fr]">
+        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+          <div className="font-mono text-xs uppercase tracking-wider">Privy email signup</div>
+          <form onSubmit={handleBuyerSignup} className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
             <input
               type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              value={buyerEmail}
+              onChange={(event) => setBuyerEmail(event.target.value)}
               placeholder="email@example.com"
               className="min-h-12 rounded-xl border border-[#24221f]/25 bg-white px-4"
             />
@@ -305,35 +394,51 @@ function AuthPanel() {
               type="submit"
               className="min-h-12 rounded-xl bg-[#3f4513] px-5 font-mono text-xs uppercase tracking-wider text-[#f2ead9]"
             >
-              Sign up
+              Continue
             </button>
           </form>
-
-          <div className="mt-5 grid gap-3 font-mono text-xs uppercase tracking-wider">
-            <div className="flex justify-between border-b border-[#24221f]/10 pb-2">
-              <span>Email</span>
-              <span>{session?.email ?? 'Not signed in'}</span>
-            </div>
-            <div className="flex justify-between border-b border-[#24221f]/10 pb-2">
-              <span>Embedded wallet</span>
-              <span>{session?.wallet ?? 'Created after signup'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>ENS profile</span>
-              <span>{session?.ensProfile ?? 'Connect wallet first'}</span>
-            </div>
+          <div className="mt-4 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+            {buyerSession
+              ? `Session ready. Embedded wallet ${buyerSession.wallet}`
+              : 'Privy will create the buyer session and embedded wallet.'}
           </div>
-
-          {session && (
-            <button
-              type="button"
-              onClick={() => setSession(null)}
-              className="mt-5 w-full rounded-xl border border-[#24221f]/20 px-5 py-3 font-mono text-xs uppercase tracking-wider"
-            >
-              Sign out
-            </button>
-          )}
         </div>
+
+        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+          <div className="font-mono text-xs uppercase tracking-wider">Payment method</div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              ['card', 'Credit card', CreditCard],
+              ['crypto', 'Crypto wallet', Wallet],
+            ].map(([method, label, Icon]) => (
+              <button
+                key={method}
+                type="button"
+                onClick={() => setPaymentMethod(method)}
+                className={`rounded-xl border p-4 text-left font-mono text-xs uppercase tracking-wider ${
+                  paymentMethod === method ? 'border-[#3f4513] bg-white' : 'border-[#24221f]/15 bg-[#fff8ea]/60'
+                }`}
+              >
+                <Icon className="mb-3 h-5 w-5 text-[#3f4513]" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={handlePurchase}
+        disabled={!canPay}
+        className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+      >
+        Pay $3 and mint receipt <ChevronRight className="ml-2 h-4 w-4" />
+      </button>
+
+      <div className="mt-6 grid gap-3 font-mono text-xs uppercase tracking-wider sm:grid-cols-3">
+        <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 artist</div>
+        <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 cause</div>
+        <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 lottery</div>
       </div>
     </BlueprintFrame>
   );
@@ -341,6 +446,29 @@ function AuthPanel() {
 
 export default function App() {
   const ticketPrice = 3;
+  const artOptions = [
+    {
+      id: 'bloom',
+      title: 'Care Bloom',
+      description: 'Soft receipt artwork with petals, pools, and care signals.',
+      background:
+        'radial-gradient(circle at 25% 25%, #df8076 0 12%, transparent 28%), radial-gradient(circle at 75% 35%, #f2ead9 0 10%, transparent 26%), linear-gradient(135deg, #8da05a, #efe0c4)',
+    },
+    {
+      id: 'signal',
+      title: 'Signal Field',
+      description: 'A graphic field that feels like a public-good transmission.',
+      background:
+        'linear-gradient(135deg, rgba(63,69,19,.95), rgba(223,128,118,.72)), repeating-linear-gradient(90deg, transparent 0 16px, rgba(255,255,255,.22) 16px 18px)',
+    },
+    {
+      id: 'garden',
+      title: 'Mutual Garden',
+      description: 'Layered greens and pinks for a receipt that feels alive.',
+      background:
+        'radial-gradient(circle at 20% 70%, #69713a 0 18%, transparent 34%), radial-gradient(circle at 75% 25%, #df8076 0 14%, transparent 30%), linear-gradient(160deg, #f2ead9, #9aa36b)',
+    },
+  ];
   const causes = [
     {
       name: 'Village Health Works',
@@ -368,9 +496,14 @@ export default function App() {
     },
   ];
   const [plays, setPlays] = useState(0);
+  const [selectedArtId, setSelectedArtId] = useState(artOptions[0].id);
   const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [buyerSession, setBuyerSession] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
   const [purchases, setPurchases] = useState([]);
+  const selectedArt = artOptions.find((art) => art.id === selectedArtId) ?? artOptions[0];
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
   const split = useMemo(
     () => ({
@@ -390,12 +523,37 @@ export default function App() {
     [causes, purchases],
   );
 
+  function handleHeartStart() {
+    document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleBuyerSignup(event) {
+    event.preventDefault();
+
+    if (!buyerEmail.trim()) {
+      return;
+    }
+
+    setBuyerSession({
+      email: buyerEmail,
+      wallet: '0x9A...Care',
+    });
+  }
+
   function handlePurchase() {
+    if (!buyerSession || !selectedArt) {
+      return;
+    }
+
     setPlays((count) => {
       const nextCount = count + 1;
       const purchase = {
         ticketNumber: nextCount,
+        artId: selectedArt.id,
+        artTitle: selectedArt.title,
+        buyerEmail: buyerSession.email,
         cause: selectedCause.name,
+        paymentMethod: paymentMethod === 'card' ? 'credit card' : 'crypto',
         total: ticketPrice,
         artist: 1,
         causeShare: 1,
@@ -427,7 +585,6 @@ export default function App() {
         <div className="hidden gap-6 md:flex">
           <a href="#how">How it works</a>
           <a href="#impact">Impact</a>
-          <a href="#auth">Auth</a>
           <a href="#play">Play</a>
         </div>
         <a href="#play" className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5">
@@ -453,7 +610,7 @@ export default function App() {
               href="#play"
               className="inline-flex items-center justify-center rounded-full bg-[#3f4513] px-6 py-4 font-mono text-sm uppercase tracking-wider text-[#f2ead9] shadow-lg hover:bg-[#252a0b]"
             >
-              Press the heart <ArrowRight className="ml-2 h-4 w-4" />
+              Start with the heart <ArrowRight className="ml-2 h-4 w-4" />
             </a>
             <a
               href="#how"
@@ -463,7 +620,7 @@ export default function App() {
             </a>
           </div>
         </div>
-        <HeroMachineRender onPurchase={handlePurchase} />
+        <HeroMachineRender onHeartClick={handleHeartStart} />
       </section>
 
       <section id="how" className="mx-auto max-w-7xl px-6 py-16">
@@ -485,74 +642,32 @@ export default function App() {
       </section>
 
       <section id="play" className="mx-auto grid max-w-7xl gap-8 px-6 py-16 lg:grid-cols-[1fr_.9fr]">
-        <BlueprintFrame className="p-6 md:p-8">
-          <div className="font-mono text-xs uppercase tracking-wider">Functional prototype</div>
-          <h2 className="mt-3 font-serif text-4xl text-[#2f350d] md:text-5xl">Begin with one press.</h2>
-          <p className="mt-4 leading-8 text-[#24221f]/75">
-            This web version turns the machine into an interactive mockup: choose a recipient, press the heart,
-            and watch the receipt and impact split update.
-          </p>
+        <CheckoutPanel
+          artOptions={artOptions}
+          selectedArt={selectedArt}
+          selectedArtId={selectedArtId}
+          setSelectedArtId={setSelectedArtId}
+          causes={causes}
+          selectedCause={selectedCause}
+          selectedCauseName={selectedCauseName}
+          setSelectedCauseName={setSelectedCauseName}
+          buyerEmail={buyerEmail}
+          setBuyerEmail={setBuyerEmail}
+          buyerSession={buyerSession}
+          handleBuyerSignup={handleBuyerSignup}
+          paymentMethod={paymentMethod}
+          setPaymentMethod={setPaymentMethod}
+          handlePurchase={handlePurchase}
+        />
 
-          <div className="mt-8">
-            <div className="mb-3 font-mono text-xs uppercase tracking-wider">Choose social impact cause</div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {causes.map((cause) => {
-                const isSelected = selectedCause.name === cause.name;
-
-                return (
-                  <button
-                    key={cause.name}
-                    type="button"
-                    onClick={() => setSelectedCauseName(cause.name)}
-                    className={`min-h-36 rounded-2xl border p-4 text-left transition ${
-                      isSelected
-                        ? 'border-[#3f4513] bg-[#fff8ea] shadow-[0_10px_30px_rgba(63,69,19,.14)]'
-                        : 'border-[#24221f]/20 bg-[#fff8ea]/60 hover:bg-[#fff8ea]'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#3f4513]">
-                          {cause.category}
-                        </div>
-                        <div className="mt-2 font-serif text-2xl leading-tight">{cause.name}</div>
-                      </div>
-                      <span
-                        className={`mt-1 h-4 w-4 rounded-full border ${
-                          isSelected ? 'border-[#3f4513] bg-[#df8076]' : 'border-[#24221f]/30'
-                        }`}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-[#24221f]/70">{cause.description}</p>
-                    <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
-                      {cause.wallet}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            onClick={handlePurchase}
-            className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 sm:w-auto"
-          >
-            Purchase image for $3 <ChevronRight className="ml-2 h-4 w-4" />
-          </button>
-
-          <div className="mt-6 grid gap-3 font-mono text-xs uppercase tracking-wider sm:grid-cols-3">
-            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 artist</div>
-            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 cause</div>
-            <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 lottery</div>
-          </div>
-        </BlueprintFrame>
-
-        <ReceiptPanel plays={plays} selectedCause={selectedCause} split={split} lastPurchase={lastPurchase} />
-      </section>
-
-      <section id="auth" className="mx-auto max-w-7xl px-6 py-16">
-        <AuthPanel />
+        <ReceiptPanel
+          plays={plays}
+          selectedCause={selectedCause}
+          split={split}
+          lastPurchase={lastPurchase}
+          selectedArt={selectedArt}
+          paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
+        />
       </section>
 
       <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
