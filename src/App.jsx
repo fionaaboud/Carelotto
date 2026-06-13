@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { lookupEnsIdentity, lookupEnsName, shortenAddress } from './lib/ens';
 
 const palette = {
   olive: '#3f4513',
@@ -281,12 +282,16 @@ function CheckoutPanel({
   connectedWallet,
   handleConnectWallet,
   ensIdentity,
+  appEnsIdentity,
   paymentMethod,
   setPaymentMethod,
   handlePurchase,
 }) {
   const isHumanVerified = worldVerification.status === 'verified';
   const canPay = Boolean(selectedArt && buyerSession && isHumanVerified);
+  const ensDisplayName = ensIdentity?.displayName ?? (connectedWallet ? shortenAddress(connectedWallet.address) : null);
+  const ensTextRecords = ensIdentity?.textRecords ?? {};
+  const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
 
   return (
     <BlueprintFrame className="p-6 md:p-8">
@@ -501,11 +506,19 @@ function CheckoutPanel({
           </div>
           <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
             <div className="text-[#24221f]/55">External crypto wallet</div>
-            <div className="mt-2">{connectedWallet?.address ?? 'Not connected'}</div>
+            <div className="mt-2">{connectedWallet ? shortenAddress(connectedWallet.address) : 'Not connected'}</div>
           </div>
           <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
             <div className="text-[#24221f]/55">ENS status</div>
-            <div className="mt-2">{ensIdentity ? ensIdentity.name : 'Connect wallet first'}</div>
+            <div className="mt-2">
+              {ensIdentity?.status === 'loading'
+                ? 'Resolving...'
+                : ensIdentity?.status === 'resolved'
+                  ? ensIdentity.name
+                  : connectedWallet
+                    ? 'Address fallback'
+                    : 'Connect wallet first'}
+            </div>
           </div>
         </div>
       </div>
@@ -520,20 +533,38 @@ function CheckoutPanel({
                 'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
             }}
           >
-            CL
+            {ensAvatarIsImage ? (
+              <img src={ensIdentity.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+            ) : (
+              ensIdentity?.avatarLabel ?? 'CL'
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-serif text-3xl leading-tight text-[#2f350d]">
-              {ensIdentity?.name ?? connectedWallet?.address ?? 'No wallet connected'}
+              {ensDisplayName ?? 'No wallet connected'}
             </div>
             <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-              {ensIdentity
-                ? `Resolved from ${ensIdentity.address}`
-                : 'Fallback will show shortened wallet address until ENS resolves.'}
+              {ensIdentity?.message ?? 'Fallback will show shortened wallet address until ENS resolves.'}
             </div>
+            {Object.keys(ensTextRecords).length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/65">
+                {Object.entries(ensTextRecords)
+                  .filter(([key]) => key !== 'avatar')
+                  .map(([key, value]) => (
+                    <span key={key} className="rounded-full border border-[#24221f]/15 px-2 py-1">
+                      {key}: {value}
+                    </span>
+                  ))}
+              </div>
+            ) : null}
+            {appEnsIdentity ? (
+              <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+                App identity: {appEnsIdentity.name} resolves to {shortenAddress(appEnsIdentity.address)}
+              </div>
+            ) : null}
           </div>
           <span className="rounded-full border border-[#24221f]/20 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
-            {ensIdentity ? 'Resolved' : 'Waiting'}
+            {ensIdentity?.status === 'resolved' ? 'Resolved' : ensIdentity?.status === 'loading' ? 'Resolving' : 'Fallback'}
           </span>
         </div>
       </div>
@@ -557,6 +588,7 @@ function CheckoutPanel({
 
 function CareProfile({
   ensIdentity,
+  appEnsIdentity,
   connectedWallet,
   buyerSession,
   worldVerification,
@@ -565,8 +597,14 @@ function CareProfile({
   selectedArt,
   selectedCause,
 }) {
-  const displayName = ensIdentity?.name ?? connectedWallet?.address ?? buyerSession?.wallet ?? 'Connect to build profile';
+  const displayName =
+    ensIdentity?.displayName ??
+    (connectedWallet ? shortenAddress(connectedWallet.address) : null) ??
+    buyerSession?.wallet ??
+    'Connect to build profile';
   const latestPurchase = purchases[purchases.length - 1];
+  const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
+  const profileDescription = ensIdentity?.textRecords?.description;
 
   return (
     <section id="profile" className="mx-auto max-w-7xl px-6 py-16">
@@ -582,19 +620,28 @@ function CareProfile({
                     'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
                 }}
               >
-                {ensIdentity?.avatar ?? 'CL'}
+                {ensAvatarIsImage ? (
+                  <img src={ensIdentity.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  ensIdentity?.avatarLabel ?? 'CL'
+                )}
               </div>
               <div>
                 <h2 className="font-serif text-4xl leading-tight text-[#2f350d]">{displayName}</h2>
                 <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-                  {ensIdentity ? 'Resolved ENS care identity' : 'Wallet fallback profile'}
+                  {ensIdentity?.status === 'resolved' ? 'Resolved ENS care identity' : 'Wallet fallback profile'}
                 </div>
               </div>
             </div>
             <p className="mt-5 leading-8 text-[#24221f]/75">
-              This profile turns a buyer wallet into a public care trail: artwork collected, causes supported, and
-              lottery participation in one judge-friendly view.
+              {profileDescription ||
+                'This profile turns a buyer wallet into a public care trail: artwork collected, causes supported, and lottery participation in one judge-friendly view.'}
             </p>
+            {appEnsIdentity ? (
+              <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-[#fff8ea]/70 p-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+                CareLotto operator ENS: {appEnsIdentity.name} {'->'} {shortenAddress(appEnsIdentity.address)}
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-4">
@@ -724,18 +771,13 @@ export default function App() {
     proofId: null,
   });
   const [connectedWallet, setConnectedWallet] = useState(null);
+  const [ensIdentity, setEnsIdentity] = useState(null);
+  const [appEnsIdentity, setAppEnsIdentity] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
   const [purchases, setPurchases] = useState([]);
   const selectedArt = artOptions.find((art) => art.id === selectedArtId) ?? artOptions[0];
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
-  const ensIdentity = connectedWallet
-    ? {
-        name: 'carelotto.eth',
-        address: connectedWallet.address,
-        avatar: 'CL',
-      }
-    : null;
   const split = useMemo(
     () => ({
       artist: plays,
@@ -754,6 +796,66 @@ export default function App() {
     [causes, purchases],
   );
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!connectedWallet?.address) {
+      setEnsIdentity(null);
+      return undefined;
+    }
+
+    setEnsIdentity({
+      status: 'loading',
+      address: connectedWallet.address,
+      displayName: shortenAddress(connectedWallet.address),
+      message: 'Resolving ENS name, avatar, and text records...',
+      textRecords: {},
+    });
+
+    lookupEnsIdentity(connectedWallet.address)
+      .then((identity) => {
+        if (isMounted) {
+          setEnsIdentity(identity);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setEnsIdentity({
+            status: 'fallback',
+            address: connectedWallet.address,
+            displayName: shortenAddress(connectedWallet.address),
+            message: 'ENS lookup unavailable. Showing wallet fallback.',
+            textRecords: {},
+          });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [connectedWallet]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const operatorName = import.meta.env.VITE_OPERATOR_ENS_NAME || 'carelotto.eth';
+
+    lookupEnsName(operatorName)
+      .then((identity) => {
+        if (isMounted) {
+          setAppEnsIdentity(identity);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setAppEnsIdentity(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function handleHeartStart() {
     document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -767,7 +869,7 @@ export default function App() {
 
     setBuyerSession({
       email: buyerEmail,
-      wallet: '0x9A2c...Care',
+      wallet: shortenAddress(import.meta.env.VITE_DEMO_EMBEDDED_WALLET || '0x9a2c4d4f8f0c8f1c6a7a4f4e6f5b4c3d2e1a0b9c'),
     });
 
     setWorldVerification({
@@ -791,8 +893,8 @@ export default function App() {
 
   function handleConnectWallet() {
     setConnectedWallet({
-      address: '0x7A91...E115',
-      network: 'Base Sepolia',
+      address: import.meta.env.VITE_DEMO_WALLET_ADDRESS || '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+      network: 'Ethereum Mainnet',
     });
   }
 
@@ -918,6 +1020,7 @@ export default function App() {
           connectedWallet={connectedWallet}
           handleConnectWallet={handleConnectWallet}
           ensIdentity={ensIdentity}
+          appEnsIdentity={appEnsIdentity}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           handlePurchase={handlePurchase}
@@ -936,6 +1039,7 @@ export default function App() {
 
       <CareProfile
         ensIdentity={ensIdentity}
+        appEnsIdentity={appEnsIdentity}
         connectedWallet={connectedWallet}
         buyerSession={buyerSession}
         worldVerification={worldVerification}

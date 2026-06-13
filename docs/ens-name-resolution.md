@@ -2,31 +2,38 @@
 
 ## Goal
 
-Resolve the connected wallet identity into an ENS profile for the CareLotto demo.
+Resolve the connected wallet identity into an ENS profile for the CareLotto demo using live mainnet ENS calls.
 
-## Demo ENS Identity
+## Live ENS Identity
 
-The prototype uses `carelotto.eth` as the demo ENS name once a wallet is connected.
+The prototype no longer hard-codes `carelotto.eth` as the buyer identity.
 
-This is mock-first for the hackathon demo. It does not claim the public ENS name currently resolves onchain.
+Connected wallets are resolved through the ENS registry and resolver contracts on Ethereum mainnet. `carelotto.eth` is only shown as the app/operator ENS identity if it resolves onchain through `VITE_OPERATOR_ENS_NAME`.
 
 ## Current Prototype Behavior
 
 - A connected crypto wallet shows an ENS resolution card.
-- `carelotto.eth` appears as the resolved identity.
-- The connected wallet address remains visible as the fallback source.
-- If no wallet is connected, the UI explains that it will fall back to a shortened address.
+- The app performs reverse ENS resolution for the connected wallet address.
+- Forward resolution is checked before accepting a reverse ENS name.
+- ENS avatar and text records are read when they are available.
+- Wallets without ENS fall back to a shortened address.
+- If no wallet is connected, the UI explains that the address fallback will appear after connection.
 
-## Later Integration
+## Environment
 
-- Replace the mock resolver with live ENS lookup.
-- Resolve name, avatar, and text records from the connected wallet address.
-- Keep wallet-address fallback for users without ENS.
+```bash
+VITE_MAINNET_RPC_URL=https://cloudflare-eth.com
+VITE_OPERATOR_ENS_NAME=carelotto.eth
+VITE_DEMO_WALLET_ADDRESS=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+```
+
+Use a project RPC URL for the final demo if the public fallback RPC is rate-limited.
 
 ## Acceptance Checklist
 
-- [x] Connected wallet can resolve to a visible ENS name.
-- [x] `carelotto.eth` appears in the demo UI.
+- [x] Connected wallet can resolve to a live ENS name.
+- [x] ENS avatar is requested from the resolved name.
+- [x] ENS text records are requested from the resolved name.
 - [x] Wallet address fallback is documented.
 - [x] ENS-ready state appears in checkout.
-- [ ] Replace mock resolver with live ENS provider lookup.
+- [x] `carelotto.eth` only appears when it resolves as the app/operator identity.
