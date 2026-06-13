@@ -272,6 +272,8 @@ function CheckoutPanel({
   setBuyerEmail,
   buyerSession,
   handleBuyerSignup,
+  connectedWallet,
+  handleConnectWallet,
   paymentMethod,
   setPaymentMethod,
   handlePurchase,
@@ -424,6 +426,51 @@ function CheckoutPanel({
               </button>
             ))}
           </div>
+
+          <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-3 font-mono text-[10px] uppercase tracking-wide">
+            {paymentMethod === 'crypto' ? (
+              connectedWallet ? (
+                <div className="grid gap-2">
+                  <div className="flex justify-between gap-4">
+                    <span>Connected wallet</span>
+                    <span>{connectedWallet.address}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span>Network</span>
+                    <span>{connectedWallet.network}</span>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConnectWallet}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-[#3f4513] px-4 py-3 text-[#f2ead9]"
+                >
+                  Connect demo wallet
+                </button>
+              )
+            ) : (
+              <div>Card checkout placeholder. Crypto wallet can be connected later.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+        <div className="font-mono text-xs uppercase tracking-wider">Wallet identity</div>
+        <div className="mt-3 grid gap-3 font-mono text-[10px] uppercase tracking-wide md:grid-cols-3">
+          <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+            <div className="text-[#24221f]/55">Privy embedded wallet</div>
+            <div className="mt-2">{buyerSession?.wallet ?? 'Created after email signup'}</div>
+          </div>
+          <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+            <div className="text-[#24221f]/55">External crypto wallet</div>
+            <div className="mt-2">{connectedWallet?.address ?? 'Not connected'}</div>
+          </div>
+          <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+            <div className="text-[#24221f]/55">ENS status</div>
+            <div className="mt-2">{connectedWallet ? 'Ready for ENS lookup' : 'Connect wallet first'}</div>
+          </div>
         </div>
       </div>
 
@@ -500,6 +547,7 @@ export default function App() {
   const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
   const [buyerEmail, setBuyerEmail] = useState('');
   const [buyerSession, setBuyerSession] = useState(null);
+  const [connectedWallet, setConnectedWallet] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
   const [purchases, setPurchases] = useState([]);
@@ -536,7 +584,14 @@ export default function App() {
 
     setBuyerSession({
       email: buyerEmail,
-      wallet: '0x9A...Care',
+      wallet: '0x9A2c...Care',
+    });
+  }
+
+  function handleConnectWallet() {
+    setConnectedWallet({
+      address: '0x7A91...E115',
+      network: 'Base Sepolia',
     });
   }
 
@@ -655,6 +710,8 @@ export default function App() {
           setBuyerEmail={setBuyerEmail}
           buyerSession={buyerSession}
           handleBuyerSignup={handleBuyerSignup}
+          connectedWallet={connectedWallet}
+          handleConnectWallet={handleConnectWallet}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           handlePurchase={handlePurchase}
