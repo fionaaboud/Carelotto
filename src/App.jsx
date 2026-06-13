@@ -520,6 +520,99 @@ function CheckoutPanel({
   );
 }
 
+function CareProfile({ ensIdentity, connectedWallet, buyerSession, purchases, split, selectedArt, selectedCause }) {
+  const displayName = ensIdentity?.name ?? connectedWallet?.address ?? buyerSession?.wallet ?? 'Connect to build profile';
+  const latestPurchase = purchases[purchases.length - 1];
+
+  return (
+    <section id="profile" className="mx-auto max-w-7xl px-6 py-16">
+      <BlueprintFrame className="p-6 md:p-8">
+        <div className="grid gap-8 lg:grid-cols-[.75fr_1.25fr]">
+          <div>
+            <div className="font-mono text-xs uppercase tracking-wider">ENS care profile</div>
+            <div className="mt-4 flex items-center gap-4">
+              <div
+                className="grid h-20 w-20 shrink-0 place-items-center rounded-full border border-[#24221f]/20 font-serif text-3xl text-[#f2ead9]"
+                style={{
+                  background:
+                    'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
+                }}
+              >
+                {ensIdentity?.avatar ?? 'CL'}
+              </div>
+              <div>
+                <h2 className="font-serif text-4xl leading-tight text-[#2f350d]">{displayName}</h2>
+                <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+                  {ensIdentity ? 'Resolved ENS care identity' : 'Wallet fallback profile'}
+                </div>
+              </div>
+            </div>
+            <p className="mt-5 leading-8 text-[#24221f]/75">
+              This profile turns a buyer wallet into a public care trail: artwork collected, causes supported, and
+              lottery participation in one judge-friendly view.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              {[
+                ['Receipts', purchases.length],
+                ['Artist', `$${split.artist}`],
+                ['Causes', `$${split.cause}`],
+                ['Lottery', `$${split.lottery}`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                  <div className="mt-2 font-serif text-3xl text-[#2f350d]">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="font-mono text-xs uppercase tracking-wider">Current intent</div>
+                <div className="mt-3 font-serif text-2xl">{selectedArt.title}</div>
+                <div className="mt-2 text-sm leading-6 text-[#24221f]/70">{selectedArt.description}</div>
+                <div className="mt-4 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+                  Supporting {selectedCause.name}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="font-mono text-xs uppercase tracking-wider">Latest receipt</div>
+                {latestPurchase ? (
+                  <div className="mt-3 grid gap-2 font-mono text-[10px] uppercase tracking-wide">
+                    <div className="flex justify-between gap-4">
+                      <span>Ticket</span>
+                      <span>{String(latestPurchase.ticketNumber).padStart(3, '0')}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span>Artwork</span>
+                      <span>{latestPurchase.artTitle}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span>Cause</span>
+                      <span>{latestPurchase.cause}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span>Payment</span>
+                      <span>{latestPurchase.paymentMethod}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm leading-6 text-[#24221f]/70">
+                    Complete a demo purchase to populate receipt history.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </BlueprintFrame>
+    </section>
+  );
+}
+
 export default function App() {
   const ticketPrice = 3;
   const artOptions = [
@@ -676,6 +769,7 @@ export default function App() {
         <div className="hidden gap-6 md:flex">
           <a href="#how">How it works</a>
           <a href="#impact">Impact</a>
+          <a href="#profile">Profile</a>
           <a href="#play">Play</a>
         </div>
         <a href="#play" className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5">
@@ -763,6 +857,16 @@ export default function App() {
           paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
         />
       </section>
+
+      <CareProfile
+        ensIdentity={ensIdentity}
+        connectedWallet={connectedWallet}
+        buyerSession={buyerSession}
+        purchases={purchases}
+        split={split}
+        selectedArt={selectedArt}
+        selectedCause={selectedCause}
+      />
 
       <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
         <BlueprintFrame className="p-6 md:p-8">
