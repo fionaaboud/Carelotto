@@ -8,6 +8,7 @@ import {
   Heart,
   Palette,
   QrCode,
+  ShieldCheck,
   Sparkles,
   Ticket,
   Users,
@@ -189,7 +190,7 @@ function SplitDiagram() {
   );
 }
 
-function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod }) {
+function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod, worldVerification }) {
   const rows = [
     ['Total paid', `$${split.total}`],
     ['Artist wallet', `$${split.artist}`],
@@ -213,6 +214,9 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
         </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
           Cause: {selectedCause.name}
+        </div>
+        <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
+          Human proof: {worldVerification.status === 'verified' ? 'World ID verified' : 'Pending'}
         </div>
         <div className="space-y-2 font-mono text-sm">
           {rows.map(([key, value]) => (
@@ -272,6 +276,8 @@ function CheckoutPanel({
   setBuyerEmail,
   buyerSession,
   handleBuyerSignup,
+  worldVerification,
+  handleWorldVerification,
   connectedWallet,
   handleConnectWallet,
   ensIdentity,
@@ -279,7 +285,8 @@ function CheckoutPanel({
   setPaymentMethod,
   handlePurchase,
 }) {
-  const canPay = Boolean(selectedArt && buyerSession);
+  const isHumanVerified = worldVerification.status === 'verified';
+  const canPay = Boolean(selectedArt && buyerSession && isHumanVerified);
 
   return (
     <BlueprintFrame className="p-6 md:p-8">
@@ -294,8 +301,8 @@ function CheckoutPanel({
         {[
           ['1', 'Choose art', selectedArt],
           ['2', 'Email signup', buyerSession],
-          ['3', 'Payment', paymentMethod],
-          ['4', 'Receipt', canPay],
+          ['3', 'Proof of human', isHumanVerified],
+          ['4', 'Payment', paymentMethod],
         ].map(([number, label, active]) => (
           <div
             key={label}
@@ -408,6 +415,34 @@ function CheckoutPanel({
         </div>
 
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+          <div className="font-mono text-xs uppercase tracking-wider">World ID verification</div>
+          <div className="mt-3 rounded-xl border border-[#24221f]/15 bg-white/60 p-4">
+            <ShieldCheck className="mb-3 h-6 w-6 text-[#3f4513]" />
+            <div className="font-serif text-2xl">
+              {isHumanVerified ? 'Verified human' : 'One human, one receipt'}
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
+              World ID protects the lottery pool from duplicate or automated participation.
+            </p>
+            <button
+              type="button"
+              onClick={handleWorldVerification}
+              disabled={!buyerSession || isHumanVerified}
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-[#3f4513] px-5 py-3 font-mono text-xs uppercase tracking-wider text-[#f2ead9] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isHumanVerified ? 'Proof confirmed' : 'Verify with World ID'}
+            </button>
+            <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+              {buyerSession
+                ? worldVerification.message
+                : 'Sign up with email before starting proof-of-human verification.'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_.9fr]">
+        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
           <div className="font-mono text-xs uppercase tracking-wider">Payment method</div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {[
@@ -508,7 +543,7 @@ function CheckoutPanel({
         disabled={!canPay}
         className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
       >
-        Pay $3 and mint receipt <ChevronRight className="ml-2 h-4 w-4" />
+        {canPay ? 'Pay $3 and mint receipt' : 'Complete signup and World ID'} <ChevronRight className="ml-2 h-4 w-4" />
       </button>
 
       <div className="mt-6 grid gap-3 font-mono text-xs uppercase tracking-wider sm:grid-cols-3">
@@ -520,7 +555,16 @@ function CheckoutPanel({
   );
 }
 
-function CareProfile({ ensIdentity, connectedWallet, buyerSession, purchases, split, selectedArt, selectedCause }) {
+function CareProfile({
+  ensIdentity,
+  connectedWallet,
+  buyerSession,
+  worldVerification,
+  purchases,
+  split,
+  selectedArt,
+  selectedCause,
+}) {
   const displayName = ensIdentity?.name ?? connectedWallet?.address ?? buyerSession?.wallet ?? 'Connect to build profile';
   const latestPurchase = purchases[purchases.length - 1];
 
@@ -560,6 +604,7 @@ function CareProfile({ ensIdentity, connectedWallet, buyerSession, purchases, sp
                 ['Artist', `$${split.artist}`],
                 ['Causes', `$${split.cause}`],
                 ['Lottery', `$${split.lottery}`],
+                ['Human', worldVerification.status === 'verified' ? 'Yes' : 'No'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
                   <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
@@ -597,6 +642,10 @@ function CareProfile({ ensIdentity, connectedWallet, buyerSession, purchases, sp
                     <div className="flex justify-between gap-4">
                       <span>Payment</span>
                       <span>{latestPurchase.paymentMethod}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span>World ID</span>
+                      <span>{latestPurchase.worldProof ? 'verified' : 'pending'}</span>
                     </div>
                   </div>
                 ) : (
@@ -669,6 +718,11 @@ export default function App() {
   const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
   const [buyerEmail, setBuyerEmail] = useState('');
   const [buyerSession, setBuyerSession] = useState(null);
+  const [worldVerification, setWorldVerification] = useState({
+    status: 'not_started',
+    message: 'World ID proof not started.',
+    proofId: null,
+  });
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
@@ -715,6 +769,24 @@ export default function App() {
       email: buyerEmail,
       wallet: '0x9A2c...Care',
     });
+
+    setWorldVerification({
+      status: 'ready',
+      message: 'Ready to request World ID proof.',
+      proofId: null,
+    });
+  }
+
+  function handleWorldVerification() {
+    if (!buyerSession) {
+      return;
+    }
+
+    setWorldVerification({
+      status: 'verified',
+      message: 'Proof of human verified for this demo session.',
+      proofId: 'world-proof-demo-001',
+    });
   }
 
   function handleConnectWallet() {
@@ -725,7 +797,7 @@ export default function App() {
   }
 
   function handlePurchase() {
-    if (!buyerSession || !selectedArt) {
+    if (!buyerSession || worldVerification.status !== 'verified' || !selectedArt) {
       return;
     }
 
@@ -737,6 +809,7 @@ export default function App() {
         artTitle: selectedArt.title,
         buyerEmail: buyerSession.email,
         cause: selectedCause.name,
+        worldProof: worldVerification.proofId,
         paymentMethod: paymentMethod === 'card' ? 'credit card' : 'crypto',
         total: ticketPrice,
         artist: 1,
@@ -840,6 +913,8 @@ export default function App() {
           setBuyerEmail={setBuyerEmail}
           buyerSession={buyerSession}
           handleBuyerSignup={handleBuyerSignup}
+          worldVerification={worldVerification}
+          handleWorldVerification={handleWorldVerification}
           connectedWallet={connectedWallet}
           handleConnectWallet={handleConnectWallet}
           ensIdentity={ensIdentity}
@@ -855,6 +930,7 @@ export default function App() {
           lastPurchase={lastPurchase}
           selectedArt={selectedArt}
           paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
+          worldVerification={worldVerification}
         />
       </section>
 
@@ -862,6 +938,7 @@ export default function App() {
         ensIdentity={ensIdentity}
         connectedWallet={connectedWallet}
         buyerSession={buyerSession}
+        worldVerification={worldVerification}
         purchases={purchases}
         split={split}
         selectedArt={selectedArt}
