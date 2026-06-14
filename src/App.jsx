@@ -778,9 +778,12 @@ function CheckoutPanel({
   buyerAuthStep,
   buyerAuthMessage,
   isBuyerAuthPending,
+  buyerWalletCopyMessage,
   privyAuthEnabled,
   privyReady,
   handleBuyerSignup,
+  handleCopyBuyerWallet,
+  handleSwitchBuyer,
   worldVerification,
   handleWorldVerification,
   isWorldRequestPending,
@@ -1018,6 +1021,25 @@ function CheckoutPanel({
                   <div className="mt-2 break-all font-mono text-xs leading-5 text-[#24221f]">
                     {buyerSession.wallet}
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyBuyerWallet}
+                    className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-[#3f4513]/35 bg-[#fff8ea] px-4 font-mono text-[10px] uppercase tracking-wider text-[#3f4513] transition hover:bg-[#f2ead9]"
+                  >
+                    Copy wallet address
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSwitchBuyer}
+                    className="ml-2 mt-3 inline-flex min-h-10 items-center rounded-lg border border-[#24221f]/25 bg-white/70 px-4 font-mono text-[10px] uppercase tracking-wider text-[#24221f]/70 transition hover:bg-[#f2ead9]"
+                  >
+                    Switch buyer
+                  </button>
+                  {buyerWalletCopyMessage ? (
+                    <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#3f4513]">
+                      {buyerWalletCopyMessage}
+                    </div>
+                  ) : null}
                   <div className="mt-3 text-sm leading-6 text-[#24221f]/70">
                     This wallet will hold the art receipt, lottery ticket, and winner payout address.
                   </div>
@@ -1248,6 +1270,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       ? 'Privy will send a one-time email code and create the embedded wallet.'
       : 'Privy is not configured. This checkout is using a local demo wallet.',
   );
+  const [buyerWalletCopyMessage, setBuyerWalletCopyMessage] = useState('');
   const [isBuyerAuthPending, setIsBuyerAuthPending] = useState(false);
   const [worldVerification, setWorldVerification] = useState({
     status: 'not_started',
@@ -1487,6 +1510,44 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
 
   function handleHeartStart() {
     document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function handleCopyBuyerWallet() {
+    if (!buyerSession?.wallet) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(buyerSession.wallet);
+      setBuyerWalletCopyMessage('Wallet address copied.');
+    } catch {
+      setBuyerWalletCopyMessage('Copy failed. Select the wallet address manually.');
+    }
+  }
+
+  async function handleSwitchBuyer() {
+    if (privyAuth.enabled && privyAuth.authenticated && typeof privyAuth.logout === 'function') {
+      await privyAuth.logout();
+    }
+
+    setBuyerEmail('');
+    setBuyerCode('');
+    setBuyerSession(null);
+    setBuyerAuthStep('email');
+    setBuyerWalletCopyMessage('');
+    setBuyerAuthMessage(
+      privyAuth.enabled
+        ? 'Privy will send a one-time email code and create the embedded wallet.'
+        : 'Privy is not configured. This checkout is using a local demo wallet.',
+    );
+    setWorldVerification({
+      status: 'not_started',
+      message: 'World ID proof not started.',
+      proofId: null,
+    });
+    setWorldRpContext(null);
+    setWorldProofSignal(null);
+    setIsWorldWidgetOpen(false);
   }
 
   async function handleBuyerSignup(event) {
@@ -1980,9 +2041,12 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           buyerAuthStep={buyerAuthStep}
           buyerAuthMessage={buyerAuthMessage}
           isBuyerAuthPending={isBuyerAuthPending}
+          buyerWalletCopyMessage={buyerWalletCopyMessage}
           privyAuthEnabled={privyAuth.enabled}
           privyReady={privyAuth.ready}
           handleBuyerSignup={handleBuyerSignup}
+          handleCopyBuyerWallet={handleCopyBuyerWallet}
+          handleSwitchBuyer={handleSwitchBuyer}
           worldVerification={worldVerification}
           handleWorldVerification={handleWorldVerification}
           isWorldRequestPending={isWorldRequestPending}
