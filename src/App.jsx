@@ -295,6 +295,11 @@ function ReceiptPanel({ selectedCause, lastPurchase, selectedArt, worldVerificat
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
           Lottery round: #{lastPurchase?.roundId ?? lotteryRound.id}
         </div>
+        {lastPurchase?.payoutWallet ? (
+          <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
+            Winner payout wallet: {shortenAddress(lastPurchase.payoutWallet)}
+          </div>
+        ) : null}
         <div className="space-y-2 font-mono text-sm">
           {rows.map(([key, value]) => (
             <div key={key} className="flex justify-between border-b border-[#24221f]/10 pb-1">
@@ -503,7 +508,7 @@ function AdminLotteryDashboard({
                     <div className="mt-4 grid gap-3">
                       <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
                         <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
-                          Payout wallet
+                          Winner payout wallet
                         </div>
                         <div className="mt-2 font-mono text-xs uppercase tracking-wide">
                           {shortenAddress(lotteryRound.winningEntry.payoutWallet)}
@@ -556,7 +561,9 @@ function AdminLotteryDashboard({
                         <div>{entry.cause}</div>
                       </div>
                       <div>
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Payout</div>
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                          Winner payout wallet
+                        </div>
                         <div className="font-mono text-xs uppercase tracking-wide">{shortenAddress(entry.payoutWallet)}</div>
                       </div>
                     </div>
