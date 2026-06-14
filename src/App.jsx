@@ -834,16 +834,16 @@ function CheckoutPanel({
                 }`}
               >
                 {art.image ? (
-                  <div className="grid aspect-[4/5] place-items-center overflow-hidden rounded-xl border border-[#24221f]/15 bg-white/70 p-3">
+                  <div className="grid aspect-[3/2] place-items-center overflow-hidden rounded-xl border border-[#24221f]/15 bg-white/70 p-2">
                     <img
                       src={art.image}
                       alt={art.title}
-                      className="max-h-full max-w-full rounded-lg object-contain"
+                      className="h-full w-full rounded-lg object-contain"
                     />
                   </div>
                 ) : (
                   <div
-                    className="aspect-[4/5] rounded-xl border border-[#24221f]/15"
+                    className="aspect-[3/2] rounded-xl border border-[#24221f]/15"
                     style={{ background: art.background }}
                     aria-hidden="true"
                   />
@@ -1109,13 +1109,13 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       id: 'wave',
       title: 'Wave',
       description: 'A layered ocean portrait supporting ocean preservation.',
-      image: '/art/wave.jpg',
+      image: '/art/wave.png',
     },
     {
       id: 'ai-mother',
       title: 'AI Mother',
       description: 'A vision of AI helping humanity solve global problems with care.',
-      image: '/art/ai-mother.jpg',
+      image: '/art/ai-mother.png',
     },
     {
       id: 'rise',
