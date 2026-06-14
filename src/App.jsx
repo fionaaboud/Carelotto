@@ -1194,22 +1194,20 @@ function CheckoutPanel({
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={handlePurchase}
-          disabled={!canPay}
-          className="inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-        >
-          {canPay
-            ? 'Pay $3 and mint receipt'
-            : !isRoundOpen
-              ? 'Round closed'
-              : hasUsedWorldProof
-              ? 'Entry already recorded'
-              : 'Complete steps above to unlock payment'}{' '}
-          <ChevronRight className="ml-2 h-4 w-4" />
-        </button>
+      <div className="mt-8">
+        {canPay ? (
+          <button
+            type="button"
+            onClick={handlePurchase}
+            className="inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 sm:w-auto"
+          >
+            Pay $3 and mint receipt <ChevronRight className="ml-2 h-4 w-4" />
+          </button>
+        ) : (
+          <div className="rounded-xl border border-[#24221f]/15 bg-[#fff8ea]/60 p-3 text-sm leading-6 text-[#24221f]/65">
+            Live payment appears here after email wallet signup and World ID. The demo payment above works anytime.
+          </div>
+        )}
       </div>
 
     </BlueprintFrame>
