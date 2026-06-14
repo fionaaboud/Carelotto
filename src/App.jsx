@@ -788,7 +788,6 @@ function CheckoutPanel({
   lotteryRound,
   handlePurchase,
   handleDemoPayment,
-  handleSeedDemoData,
 }) {
   const isHumanVerified = worldVerification.status === 'verified';
   const isRoundOpen = lotteryRound.status === 'open';
@@ -798,7 +797,6 @@ function CheckoutPanel({
   );
   const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof && isRoundOpen);
   const canRecordDemoPayment = Boolean(selectedArt && buyerSession && isRoundOpen);
-  const canSeedDemoData = isRoundOpen;
   const participationStatus = !isRoundOpen
     ? 'Round closed'
     : !buyerSession
@@ -1117,26 +1115,16 @@ function CheckoutPanel({
           ) : null}
 
           <div className="mt-4 rounded-xl border border-[#df8076]/35 bg-white/70 p-3">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={handleDemoPayment}
-                disabled={!canRecordDemoPayment}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-[#df8076] px-5 py-4 font-mono text-xs uppercase tracking-wider text-[#24221f] shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Demo: submit payment
-              </button>
-              <button
-                type="button"
-                onClick={handleSeedDemoData}
-                disabled={!canSeedDemoData}
-                className="inline-flex w-full items-center justify-center rounded-xl border border-[#24221f]/25 bg-[#fff8ea]/80 px-5 py-4 font-mono text-xs uppercase tracking-wider text-[#24221f] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Demo: fill dashboards
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleDemoPayment}
+              disabled={!canRecordDemoPayment}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[#df8076] px-5 py-4 font-mono text-xs uppercase tracking-wider text-[#24221f] shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Demo: submit payment
+            </button>
             <p className="mt-2 text-sm leading-6 text-[#24221f]/65">
-              Use these for the presentation if World ID or checkout cannot be repeated live.
+              Use this for the presentation if World ID or checkout cannot be repeated live.
             </p>
           </div>
         </div>
@@ -1737,69 +1725,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     });
   }
 
-  function handleSeedDemoData() {
-    if (lotteryRound.status !== 'open') {
-      return;
-    }
-
-    const demoStamp = Date.now();
-    const demoTemplates = [
-      {
-        art: artOptions[0],
-        cause: causes[0],
-        buyerEmail: 'demo.health@carelotto.test',
-        payoutWallet: '0x1111111111111111111111111111111111111111',
-      },
-      {
-        art: artOptions[1],
-        cause: causes[1],
-        buyerEmail: 'demo.ocean@carelotto.test',
-        payoutWallet: '0x2222222222222222222222222222222222222222',
-      },
-      {
-        art: artOptions[2],
-        cause: causes[3],
-        buyerEmail: 'demo.rise@carelotto.test',
-        payoutWallet: '0x3333333333333333333333333333333333333333',
-      },
-    ];
-
-    setPurchases((current) => {
-      const currentRoundCount = current.filter((purchase) => purchase.roundId === lotteryRound.id).length;
-      const entriesToAdd = demoTemplates.slice(currentRoundCount, 3);
-
-      if (entriesToAdd.length === 0) {
-        setChainlinkRequestMessage('Demo dashboards already have entries. Close sales, then select the lottery winner.');
-        return current;
-      }
-
-      const additions = entriesToAdd.map((template, index) => {
-        const ticketNumber = current.length + index + 1;
-
-        return {
-          ticketNumber,
-          roundId: lotteryRound.id,
-          payoutWallet: template.payoutWallet,
-          artId: template.art.id,
-          artTitle: template.art.title,
-          buyerEmail: template.buyerEmail,
-          cause: template.cause.name,
-          worldProof: `demo-seed-${lotteryRound.id}-${demoStamp}-${index + 1}`,
-          paymentMethod: 'demo seeded payment',
-          total: ticketPrice,
-          artist: 1,
-          causeShare: 1,
-          lottery: 1,
-        };
-      });
-
-      setLastPurchase(additions[additions.length - 1]);
-      return [...current, ...additions];
-    });
-
-    setChainlinkRequestMessage('Demo entries loaded. Close sales, then select the lottery winner.');
-  }
-
   return (
     <main
       className="min-h-screen overflow-hidden text-[#24221f]"
@@ -1967,7 +1892,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           lotteryRound={lotteryRound}
           handlePurchase={handlePurchase}
           handleDemoPayment={handleDemoPayment}
-          handleSeedDemoData={handleSeedDemoData}
         />
 
         <div className="mt-8">
