@@ -367,11 +367,10 @@ function AdminLotteryDashboard({
               <ShieldCheck className="h-4 w-4 text-[#df8076]" /> Admin lottery dashboard
             </div>
             <h2 className="mt-3 font-serif text-4xl text-[#2f350d]">
-              See how Chainlink picks the prize winner.
+              Pick the prize winner.
             </h2>
             <p className="mt-4 leading-8 text-[#24221f]/75">
-              The operator closes ticket sales, asks Chainlink for a fair random number, then shows how it selects one
-              artwork receipt from the locked round entries.
+              Close ticket sales, select one artwork receipt from the locked round entries, and track the prize payout.
             </p>
 
             <div className="mt-6 grid gap-3">
