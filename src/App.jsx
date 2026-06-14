@@ -811,7 +811,7 @@ function CheckoutPanel({
       purchases.some((purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id),
   );
   const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof && isRoundOpen);
-  const canRecordDemoPayment = Boolean(selectedArt && buyerSession && isRoundOpen);
+  const canRecordDemoPayment = Boolean(selectedArt && isRoundOpen);
   const participationStatus = !isRoundOpen
     ? 'Round closed'
     : !buyerSession
@@ -1190,7 +1190,7 @@ function CheckoutPanel({
               Demo: submit payment
             </button>
             <p className="mt-2 text-sm leading-6 text-[#24221f]/65">
-              Use this for the presentation if World ID or checkout cannot be repeated live.
+              Use this for the presentation if Privy, World ID, or checkout cannot be repeated live.
             </p>
           </div>
         </div>
@@ -1825,18 +1825,20 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     }));
   }
 
-  async function recordPurchase({ worldProof, paymentMethodLabel }) {
-    if (!buyerSession || !selectedArt || lotteryRound.status !== 'open') {
+  async function recordPurchase({ worldProof, paymentMethodLabel, buyerOverride }) {
+    const purchaseBuyer = buyerOverride ?? buyerSession;
+
+    if (!purchaseBuyer || !selectedArt || lotteryRound.status !== 'open') {
       return;
     }
 
     const purchase = {
       ticketNumber: purchases.length + 1,
       roundId: lotteryRound.id,
-      payoutWallet: buyerSession.wallet,
+      payoutWallet: purchaseBuyer.wallet,
       artId: selectedArt.id,
       artTitle: selectedArt.title,
-      buyerEmail: buyerSession.email,
+      buyerEmail: purchaseBuyer.email,
       cause: selectedCause.name,
       worldProof,
       paymentMethod: paymentMethodLabel,
@@ -1886,13 +1888,33 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   }
 
   function handleDemoPayment() {
-    if (!buyerSession || !selectedArt || lotteryRound.status !== 'open') {
+    if (!selectedArt || lotteryRound.status !== 'open') {
       return;
+    }
+
+    const demoBuyer = buyerSession ?? {
+      email: buyerEmail.trim() || 'demo-buyer@carelotto.app',
+      wallet: import.meta.env.VITE_DEMO_EMBEDDED_WALLET || '0x9a2c4d4f8f0c8f1c6a7a4f4e6f5b4c3d2e1a0b9c',
+    };
+
+    if (!buyerSession) {
+      setBuyerEmail(demoBuyer.email);
+      setBuyerSession(demoBuyer);
+      setBuyerAuthStep('connected');
+      setBuyerAuthMessage('Demo wallet session ready. Receipt and lottery ticket are assigned.');
+      setWorldVerification({
+        status: 'ready',
+        message: 'Demo payment recorded. World ID can be skipped for this presentation path.',
+        proofId: null,
+      });
+      setWorldRpContext(null);
+      setWorldProofSignal(null);
     }
 
     recordPurchase({
       worldProof: `demo-${lotteryRound.id}-${Date.now()}`,
       paymentMethodLabel: paymentMethod === 'card' ? 'demo card payment' : 'demo crypto payment',
+      buyerOverride: demoBuyer,
     });
   }
 
