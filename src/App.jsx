@@ -421,11 +421,19 @@ function CheckoutPanel({
                     : 'border-[#24221f]/20 bg-[#fff8ea]/60 hover:bg-[#fff8ea]'
                 }`}
               >
-                <div
-                  className="h-32 rounded-xl border border-[#24221f]/15"
-                  style={{ background: art.background }}
-                  aria-hidden="true"
-                />
+                {art.image ? (
+                  <img
+                    src={art.image}
+                    alt={art.title}
+                    className="h-44 w-full rounded-xl border border-[#24221f]/15 object-cover"
+                  />
+                ) : (
+                  <div
+                    className="h-44 rounded-xl border border-[#24221f]/15"
+                    style={{ background: art.background }}
+                    aria-hidden="true"
+                  />
+                )}
                 <div className="mt-3 font-serif text-2xl">{art.title}</div>
                 <p className="mt-1 text-sm leading-6 text-[#24221f]/70">{art.description}</p>
               </button>
@@ -813,6 +821,24 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   const ticketPrice = 3;
   const artOptions = [
     {
+      id: 'wave',
+      title: 'Wave',
+      description: 'A layered ocean portrait supporting ocean preservation.',
+      image: '/art/wave.jpg',
+    },
+    {
+      id: 'ai-mother',
+      title: 'AI Mother',
+      description: 'A vision of AI helping humanity solve global problems with care.',
+      image: '/art/ai-mother.jpg',
+    },
+    {
+      id: 'rise',
+      title: 'Rise',
+      description: 'A blue-and-yellow heart supporting families affected by the war in Ukraine.',
+      image: '/art/rise.jpg',
+    },
+    {
       id: 'bloom',
       title: 'Care Bloom',
       description: 'Soft receipt artwork with petals, pools, and care signals.',
@@ -854,10 +880,10 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       description: 'Helps stock weekly pantry drops and essentials.',
     },
     {
-      name: 'Maternal care project',
-      wallet: '0x73...Moms',
-      category: 'Family support',
-      description: 'Backs care kits and transport for maternal visits.',
+      name: 'Ukraine family relief',
+      wallet: '0x73...Rise',
+      category: 'War relief',
+      description: 'Supports families affected by the war in Ukraine with care, shelter, and essentials.',
     },
   ];
   const [plays, setPlays] = useState(0);
