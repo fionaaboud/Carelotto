@@ -1002,6 +1002,29 @@ function CheckoutPanel({
               ? `Email submitted. Wallet ${shortenAddress(buyerSession.wallet)} is ready for this receipt.`
               : buyerAuthMessage}
           </div>
+          {buyerSession ? (
+            <div className="mt-4 rounded-xl border border-[#3f4513]/30 bg-white/65 p-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 inline-grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#3f4513] text-[#f2ead9]">
+                  <Wallet className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#3f4513]">
+                    {privyAuthEnabled ? 'Privy wallet connected' : 'Demo wallet connected'}
+                  </div>
+                  <div className="mt-2 break-words text-sm leading-6 text-[#24221f]/80">
+                    {buyerSession.email}
+                  </div>
+                  <div className="mt-2 break-all font-mono text-xs leading-5 text-[#24221f]">
+                    {buyerSession.wallet}
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-[#24221f]/70">
+                    This wallet will hold the art receipt, lottery ticket, and winner payout address.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4 lg:sticky lg:top-6">
