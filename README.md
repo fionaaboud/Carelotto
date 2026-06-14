@@ -1,6 +1,6 @@
 # CareLotto
 
-CareLotto is a participatory social sculpture that transforms chance into collective care through transparent funding, generative art, and community impact.
+CareLotto turns an art vending machine into an onchain lottery for chance, transparent giving, and collective care.
 
 This repository currently contains a Vite + React prototype homepage for CareLotto, styled with Tailwind CSS and animated with Framer Motion.
 
