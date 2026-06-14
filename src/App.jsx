@@ -1547,6 +1547,31 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     }));
   }
 
+  function selectDemoLotteryWinner(message) {
+    const requestId = `vrf-${lotteryRound.id}-${String(Date.now()).slice(-6)}`;
+    const randomWord = currentRoundEntries.reduce((seed, entry, index) => {
+      const artScore = entry.artTitle.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0);
+      return seed + artScore + entry.ticketNumber * (index + 7);
+    }, lotteryRound.id * 7919);
+    const winningEntryIndex = randomWord % currentRoundEntries.length;
+    const winningEntry = {
+      ...currentRoundEntries[winningEntryIndex],
+      winningEntryIndex,
+    };
+
+    setLotteryRound((round) => ({
+      ...round,
+      status: 'fulfilled',
+      winnerRequest: 'fulfilled',
+      vrfRequestId: requestId,
+      chainlinkTxHash: null,
+      randomWord,
+      winningEntry,
+      prizeClaimStatus: 'ready',
+    }));
+    setChainlinkRequestMessage(message);
+  }
+
   async function handleRequestLotteryWinner() {
     if (lotteryRound.status !== 'closed' || currentRoundEntries.length === 0) {
       return;
@@ -1555,7 +1580,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     const contractAddress = import.meta.env.VITE_CARELOTTO_CONTRACT_ADDRESS;
 
     if (contractAddress && !window.ethereum) {
-      setChainlinkRequestMessage('Install or open a browser wallet to send the real Chainlink VRF request.');
+      selectDemoLotteryWinner('Demo winner selected because a browser wallet was not available for Sepolia.');
       return;
     }
 
@@ -1569,9 +1594,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         });
       } catch (switchError) {
         if (switchError?.code !== 4902) {
-          setChainlinkRequestMessage(
-            switchError instanceof Error ? switchError.message : 'Could not switch wallet to Sepolia.',
-          );
+          selectDemoLotteryWinner('Demo winner selected because the wallet could not switch to Sepolia.');
           return;
         }
       }
@@ -1596,36 +1619,13 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         }));
         setChainlinkRequestMessage('Chainlink VRF request transaction sent. The coordinator will fulfill it onchain.');
       } catch (error) {
-        setChainlinkRequestMessage(
-          error instanceof Error ? error.message : 'Could not send the Chainlink VRF request transaction.',
-        );
+        selectDemoLotteryWinner('Demo winner selected because the Sepolia transaction was not completed.');
       }
 
       return;
     }
 
-    const requestId = `vrf-${lotteryRound.id}-${String(Date.now()).slice(-6)}`;
-    const randomWord = currentRoundEntries.reduce((seed, entry, index) => {
-      const artScore = entry.artTitle.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0);
-      return seed + artScore + entry.ticketNumber * (index + 7);
-    }, lotteryRound.id * 7919);
-    const winningEntryIndex = randomWord % currentRoundEntries.length;
-    const winningEntry = {
-      ...currentRoundEntries[winningEntryIndex],
-      winningEntryIndex,
-    };
-
-    setLotteryRound((round) => ({
-      ...round,
-      status: 'fulfilled',
-      winnerRequest: 'fulfilled',
-      vrfRequestId: requestId,
-      chainlinkTxHash: null,
-      randomWord,
-      winningEntry,
-      prizeClaimStatus: 'ready',
-    }));
-    setChainlinkRequestMessage('Demo VRF result generated. Deploy the contract to use Chainlink fulfillment.');
+    selectDemoLotteryWinner('Demo VRF result generated. Deploy the contract to use Chainlink fulfillment.');
   }
 
   function handleOpenNextLotteryRound() {
