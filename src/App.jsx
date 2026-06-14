@@ -834,16 +834,16 @@ function CheckoutPanel({
                 }`}
               >
                 {art.image ? (
-                  <div className="grid h-64 place-items-center rounded-xl border border-[#24221f]/15 bg-white/65 p-2">
+                  <div className="grid aspect-[4/5] place-items-center overflow-hidden rounded-xl border border-[#24221f]/15 bg-white/70 p-3">
                     <img
                       src={art.image}
                       alt={art.title}
-                      className="h-full w-full rounded-lg object-contain"
+                      className="max-h-full max-w-full rounded-lg object-contain"
                     />
                   </div>
                 ) : (
                   <div
-                    className="h-64 rounded-xl border border-[#24221f]/15"
+                    className="aspect-[4/5] rounded-xl border border-[#24221f]/15"
                     style={{ background: art.background }}
                     aria-hidden="true"
                   />
