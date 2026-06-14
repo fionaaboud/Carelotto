@@ -204,6 +204,11 @@ function SplitDiagram() {
 }
 
 function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod, worldVerification, lotteryRound }) {
+  const proofLabel = lastPurchase?.worldProof?.startsWith('demo-')
+    ? 'Demo proof recorded'
+    : worldVerification.status === 'verified'
+      ? 'World ID verified'
+      : 'Pending';
   const rows = [
     ['Total paid', `$${split.total}`],
     ['Artist', `$${split.artist}`],
@@ -229,7 +234,7 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
           Cause: {selectedCause.name}
         </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
-          Human proof: {worldVerification.status === 'verified' ? 'World ID verified' : 'Pending'}
+          Human proof: {proofLabel}
         </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
           Lottery round: #{lastPurchase?.roundId ?? lotteryRound.id}
@@ -732,6 +737,7 @@ function CheckoutPanel({
   purchases,
   lotteryRound,
   handlePurchase,
+  handleDemoPayment,
 }) {
   const isHumanVerified = worldVerification.status === 'verified';
   const isRoundOpen = lotteryRound.status === 'open';
@@ -740,6 +746,7 @@ function CheckoutPanel({
       purchases.some((purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id),
   );
   const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof && isRoundOpen);
+  const canRecordDemoPayment = Boolean(selectedArt && buyerSession && isRoundOpen);
   const participationStatus = !isRoundOpen
     ? 'Round closed'
     : !buyerSession
@@ -1057,20 +1064,36 @@ function CheckoutPanel({
         </div>
       </div>
 
-      <button
-        onClick={handlePurchase}
-        disabled={!canPay}
-        className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-      >
-        {canPay
-          ? 'Pay $3 and mint receipt'
-          : !isRoundOpen
-            ? 'Round closed'
-            : hasUsedWorldProof
-            ? 'Entry already recorded'
-            : 'Complete steps above to unlock payment'}{' '}
-        <ChevronRight className="ml-2 h-4 w-4" />
-      </button>
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          onClick={handlePurchase}
+          disabled={!canPay}
+          className="inline-flex w-full items-center justify-center rounded-2xl bg-[#df8076] px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] shadow-md hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          {canPay
+            ? 'Pay $3 and mint receipt'
+            : !isRoundOpen
+              ? 'Round closed'
+              : hasUsedWorldProof
+              ? 'Entry already recorded'
+              : 'Complete steps above to unlock payment'}{' '}
+          <ChevronRight className="ml-2 h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDemoPayment}
+          disabled={!canRecordDemoPayment}
+          className="inline-flex w-full items-center justify-center rounded-2xl border border-[#24221f]/25 bg-[#fff8ea]/80 px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          Record demo payment
+        </button>
+      </div>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-[#24221f]/65">
+        Use the demo button only for presentation mode if World ID has already been verified or the proof cannot be
+        repeated during the walkthrough.
+      </p>
 
     </BlueprintFrame>
   );
@@ -1590,6 +1613,36 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     }));
   }
 
+  function recordPurchase({ worldProof, paymentMethodLabel }) {
+    if (!buyerSession || !selectedArt || lotteryRound.status !== 'open') {
+      return;
+    }
+
+    setPlays((count) => {
+      const nextCount = count + 1;
+      const purchase = {
+        ticketNumber: nextCount,
+        roundId: lotteryRound.id,
+        payoutWallet: buyerSession.wallet,
+        artId: selectedArt.id,
+        artTitle: selectedArt.title,
+        buyerEmail: buyerSession.email,
+        cause: selectedCause.name,
+        worldProof,
+        paymentMethod: paymentMethodLabel,
+        total: ticketPrice,
+        artist: 1,
+        causeShare: 1,
+        lottery: 1,
+      };
+
+      setLastPurchase(purchase);
+      setPurchases((current) => [...current, purchase]);
+
+      return nextCount;
+    });
+  }
+
   function handlePurchase() {
     const hasUsedWorldProof = purchases.some(
       (purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id,
@@ -1605,28 +1658,20 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       return;
     }
 
-    setPlays((count) => {
-      const nextCount = count + 1;
-      const purchase = {
-        ticketNumber: nextCount,
-        roundId: lotteryRound.id,
-        payoutWallet: buyerSession.wallet,
-        artId: selectedArt.id,
-        artTitle: selectedArt.title,
-        buyerEmail: buyerSession.email,
-        cause: selectedCause.name,
-        worldProof: worldVerification.proofId,
-        paymentMethod: paymentMethod === 'card' ? 'credit card' : 'crypto',
-        total: ticketPrice,
-        artist: 1,
-        causeShare: 1,
-        lottery: 1,
-      };
+    recordPurchase({
+      worldProof: worldVerification.proofId,
+      paymentMethodLabel: paymentMethod === 'card' ? 'credit card' : 'crypto',
+    });
+  }
 
-      setLastPurchase(purchase);
-      setPurchases((current) => [...current, purchase]);
+  function handleDemoPayment() {
+    if (!buyerSession || !selectedArt || lotteryRound.status !== 'open') {
+      return;
+    }
 
-      return nextCount;
+    recordPurchase({
+      worldProof: `demo-${lotteryRound.id}-${Date.now()}`,
+      paymentMethodLabel: paymentMethod === 'card' ? 'demo card payment' : 'demo crypto payment',
     });
   }
 
@@ -1796,6 +1841,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           purchases={purchases}
           lotteryRound={lotteryRound}
           handlePurchase={handlePurchase}
+          handleDemoPayment={handleDemoPayment}
         />
 
         <div className="mt-8">
