@@ -177,7 +177,7 @@ function CareMachine({ plays, setPlays }) {
 
 function SplitDiagram() {
   const items = [
-    { icon: Palette, label: 'Artist wallet', text: 'Keeps the artwork alive.' },
+    { icon: Palette, label: 'Artist', text: 'Keeps the artwork alive.' },
     { icon: Users, label: 'Social impact cause', text: 'Supports care initiatives.' },
     { icon: Ticket, label: 'Lottery pool', text: 'Funds the Chainlink-selected winner.' },
   ];
@@ -206,7 +206,7 @@ function SplitDiagram() {
 function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod, worldVerification, lotteryRound }) {
   const rows = [
     ['Total paid', `$${split.total}`],
-    ['Artist wallet', `$${split.artist}`],
+    ['Artist', `$${split.artist}`],
     ['Social impact', `$${split.cause}`],
     ['Lottery pool', `$${split.lottery}`],
   ];
@@ -359,19 +359,19 @@ function CheckoutPanel({
         ? 'Checking ENS'
         : 'Address fallback';
   const signupButtonLabel = buyerSession
-    ? 'Connected'
+    ? 'Email submitted'
     : isBuyerAuthPending
-      ? 'Working'
+      ? 'Submitting'
       : privyAuthEnabled
         ? buyerAuthStep === 'code'
           ? 'Verify code'
-          : 'Send code'
-        : 'Continue demo';
+          : 'Submit email'
+        : 'Submit email';
 
   return (
     <BlueprintFrame className="p-6 md:p-8">
       <div className="font-mono text-xs uppercase tracking-wider">Checkout flow</div>
-      <h2 className="mt-3 font-serif text-4xl text-[#2f350d] md:text-5xl">Press heart. Choose art. Pay your way.</h2>
+      <h2 className="mt-3 font-serif text-4xl text-[#2f350d] md:text-5xl">Choose Art</h2>
       <p className="mt-4 max-w-2xl leading-8 text-[#24221f]/75">
         The buyer starts with the heart, selects a receipt artwork, signs up with email through the Privy
         flow, then pays by credit card or crypto.
@@ -486,8 +486,8 @@ function CheckoutPanel({
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
           <StepHeading
             number="3"
-            title="Privy email signup"
-            helper="Enter email first. If Privy is enabled, the next field asks for the email code."
+            title="Email wallet signup"
+            helper="Enter your email. It creates the wallet where your image receipt and lottery ticket will live."
           />
           <form onSubmit={handleBuyerSignup} className="mt-4 grid gap-3">
             <input
@@ -518,7 +518,7 @@ function CheckoutPanel({
           </form>
           <div className="mt-4 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
             {buyerSession
-              ? `Session ready. Embedded wallet ${shortenAddress(buyerSession.wallet)}`
+              ? `Email submitted. Wallet ${shortenAddress(buyerSession.wallet)} is ready for this receipt.`
               : buyerAuthMessage}
           </div>
         </div>
@@ -588,9 +588,9 @@ function CheckoutPanel({
             ))}
           </div>
 
-          <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-3 font-mono text-[10px] uppercase tracking-wide">
-            {paymentMethod === 'crypto' ? (
-              connectedWallet ? (
+          {paymentMethod === 'crypto' ? (
+            <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-3 font-mono text-[10px] uppercase tracking-wide">
+              {connectedWallet ? (
                 <div className="grid gap-4">
                   <div className="flex items-center gap-3">
                     <div
@@ -633,11 +633,9 @@ function CheckoutPanel({
                 >
                   Connect demo wallet
                 </button>
-              )
-            ) : (
-              <div>Card checkout placeholder. Crypto wallet can be connected later.</div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -652,15 +650,10 @@ function CheckoutPanel({
             ? 'Round closed'
             : hasUsedWorldProof
             ? 'Entry already recorded'
-            : 'Complete signup and World ID'}{' '}
+            : 'Complete steps above to unlock payment'}{' '}
         <ChevronRight className="ml-2 h-4 w-4" />
       </button>
 
-      <div className="mt-6 grid gap-3 font-mono text-xs uppercase tracking-wider sm:grid-cols-3">
-        <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 artist</div>
-        <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 cause</div>
-        <div className="rounded-xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-3">$1 lottery</div>
-      </div>
     </BlueprintFrame>
   );
 }
@@ -723,7 +716,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   const [buyerAuthMessage, setBuyerAuthMessage] = useState(
     privyAuth.enabled
       ? 'Privy will send a one-time email code and create the embedded wallet.'
-      : 'Add VITE_PRIVY_APP_ID to enable real Privy auth. Demo signup is available locally.',
+      : 'Enter your email to create the wallet session for your receipt and lottery ticket.',
   );
   const [isBuyerAuthPending, setIsBuyerAuthPending] = useState(false);
   const [worldVerification, setWorldVerification] = useState({
@@ -824,7 +817,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
 
   useEffect(() => {
     if (!privyAuth.enabled) {
-      setBuyerAuthMessage('Add VITE_PRIVY_APP_ID to enable real Privy auth. Demo signup is available locally.');
+      setBuyerAuthMessage('Enter your email to create the wallet session for your receipt and lottery ticket.');
       return;
     }
 
@@ -928,7 +921,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     setWorldRpContext(null);
     setWorldProofSignal(null);
     setBuyerAuthStep('connected');
-    setBuyerAuthMessage('Demo session ready. Add a Privy app ID to use real auth.');
+    setBuyerAuthMessage('Email submitted. Next, verify with World ID.');
   }
 
   async function handleWorldVerification() {
