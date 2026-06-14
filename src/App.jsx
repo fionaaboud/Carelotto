@@ -279,6 +279,20 @@ function HeroMachineRender({ onHeartClick }) {
   );
 }
 
+function StepHeading({ number, title, helper }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3f4513] font-mono text-xs text-[#f2ead9]">
+        {number}
+      </span>
+      <div>
+        <div className="font-mono text-xs uppercase tracking-wider text-[#3f4513]">{title}</div>
+        {helper ? <p className="mt-1 text-sm leading-6 text-[#24221f]/65">{helper}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function CheckoutPanel({
   artOptions,
   selectedArt,
@@ -359,12 +373,13 @@ function CheckoutPanel({
         flow, then pays by credit card or crypto.
       </p>
 
-      <div className="mt-8 grid gap-3 font-mono text-[10px] uppercase tracking-wider sm:grid-cols-4">
+      <div className="mt-8 grid gap-3 font-mono text-[10px] uppercase tracking-wider sm:grid-cols-5">
         {[
           ['1', 'Choose art', selectedArt],
-          ['2', 'Email signup', buyerSession],
-          ['3', 'Proof of human', isHumanVerified],
-          ['4', 'Payment', paymentMethod],
+          ['2', 'Select cause', selectedCause],
+          ['3', 'Email signup', buyerSession],
+          ['4', 'World ID', isHumanVerified],
+          ['5', 'Payment', paymentMethod],
         ].map(([number, label, active]) => (
           <div
             key={label}
@@ -380,32 +395,10 @@ function CheckoutPanel({
         ))}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#3f4513] text-[#f2ead9]">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-          <div>
-            <div className="font-mono text-xs uppercase tracking-wider">Human-gated participation</div>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-[#24221f]/70">{participationMessage}</p>
-            <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
-              Active lottery round #{lotteryRound.id}
-            </div>
-          </div>
-          </div>
-          <span
-            className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-wider ${
-              isHumanVerified ? 'border-[#3f4513] bg-white text-[#3f4513]' : 'border-[#24221f]/20 bg-[#f2ead9]/75'
-            }`}
-          >
-            {participationStatus}
-          </span>
-        </div>
-      </div>
-
       <div className="mt-8">
-        <div className="mb-3 font-mono text-xs uppercase tracking-wider">Choose receipt artwork</div>
+        <div className="mb-4">
+          <StepHeading number="1" title="Choose receipt artwork" helper="This artwork becomes the buyer's lottery ticket." />
+        </div>
         <div className="grid gap-3 md:grid-cols-3">
           {artOptions.map((art) => {
             const isSelected = selectedArtId === art.id;
@@ -443,7 +436,9 @@ function CheckoutPanel({
       </div>
 
       <div className="mt-8">
-        <div className="mb-3 font-mono text-xs uppercase tracking-wider">Choose social impact cause</div>
+        <div className="mb-4">
+          <StepHeading number="2" title="Choose social impact cause" helper="One third of the purchase supports this cause." />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {causes.map((cause) => {
             const isSelected = selectedCause.name === cause.name;
@@ -485,8 +480,12 @@ function CheckoutPanel({
 
       <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_.9fr]">
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-          <div className="font-mono text-xs uppercase tracking-wider">Privy email signup</div>
-          <form onSubmit={handleBuyerSignup} className="mt-3 grid gap-3 md:grid-cols-[1fr_.65fr_auto]">
+          <StepHeading
+            number="3"
+            title="Privy email signup"
+            helper="Enter email first. If Privy is enabled, the next field asks for the email code."
+          />
+          <form onSubmit={handleBuyerSignup} className="mt-4 grid gap-3">
             <input
               type="email"
               value={buyerEmail}
@@ -520,16 +519,32 @@ function CheckoutPanel({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-          <div className="font-mono text-xs uppercase tracking-wider">World ID verification</div>
+        <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4 lg:sticky lg:top-6">
+          <StepHeading
+            number="4"
+            title="World ID verification"
+            helper="Confirm one human, one receipt before payment unlocks."
+          />
           <div className="mt-3 rounded-xl border border-[#24221f]/15 bg-white/60 p-4">
-            <ShieldCheck className="mb-3 h-6 w-6 text-[#3f4513]" />
-            <div className="font-serif text-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <ShieldCheck className="h-6 w-6 text-[#3f4513]" />
+              <span
+                className={`rounded-full border px-3 py-2 font-mono text-[10px] uppercase tracking-wider ${
+                  isHumanVerified ? 'border-[#3f4513] bg-white text-[#3f4513]' : 'border-[#24221f]/20 bg-[#f2ead9]/75'
+                }`}
+              >
+                {participationStatus}
+              </span>
+            </div>
+            <div className="mt-3 font-serif text-2xl">
               {isHumanVerified ? 'Verified human' : 'One human, one receipt'}
             </div>
             <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
-              World ID protects the lottery pool from duplicate or automated participation before payment unlocks.
+              {participationMessage}
             </p>
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+              Active lottery round #{lotteryRound.id}
+            </div>
             <button
               type="button"
               onClick={handleWorldVerification}
@@ -549,7 +564,7 @@ function CheckoutPanel({
 
       <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_.9fr]">
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-          <div className="font-mono text-xs uppercase tracking-wider">Payment method</div>
+          <StepHeading number="5" title="Payment method" helper="Choose card for the demo path or crypto wallet for later." />
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {[
               ['card', 'Credit card', CreditCard],
@@ -1470,7 +1485,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         </BlueprintFrame>
       </section>
 
-      <section id="play" className="mx-auto grid max-w-7xl gap-8 px-6 py-16 lg:grid-cols-[1fr_.9fr]">
+      <section id="play" className="mx-auto max-w-7xl px-6 py-16">
         <CheckoutPanel
           artOptions={artOptions}
           selectedArt={selectedArt}
@@ -1505,16 +1520,18 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           handlePurchase={handlePurchase}
         />
 
-        <ReceiptPanel
-          plays={plays}
-          selectedCause={selectedCause}
-          split={split}
-          lastPurchase={lastPurchase}
-          selectedArt={selectedArt}
-          paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
-          worldVerification={worldVerification}
-          lotteryRound={lotteryRound}
-        />
+        <div className="mt-8">
+          <ReceiptPanel
+            plays={plays}
+            selectedCause={selectedCause}
+            split={split}
+            lastPurchase={lastPurchase}
+            selectedArt={selectedArt}
+            paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
+            worldVerification={worldVerification}
+            lotteryRound={lotteryRound}
+          />
+        </div>
       </section>
 
       <CareProfile
