@@ -1121,7 +1121,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       id: 'rise',
       title: 'Rise',
       description: 'A blue-and-yellow heart supporting families affected by the war in Ukraine.',
-      image: '/art/rise.jpg',
+      image: '/art/rise.png',
     },
   ];
   const causes = [
