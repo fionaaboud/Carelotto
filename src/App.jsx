@@ -1129,7 +1129,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       name: 'Village Health Works',
       wallet: '0x8F...Care',
       category: 'Clinic care',
-      description: 'Funds community health visits and patient support.',
+      description: 'Funds community health visits and patient support in Burundi.',
     },
     {
       name: 'Bye Bye Plastic',
