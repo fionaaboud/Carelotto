@@ -37,6 +37,55 @@ const palette = {
 
 const REQUEST_LOTTERY_WINNER_CALLDATA = '0x5352619d';
 const SEPOLIA_CHAIN_ID = '0xaa36a7';
+const PURCHASES_STORAGE_KEY = 'carelotto:purchases:v1';
+const LOTTERY_ROUND_STORAGE_KEY = 'carelotto:lottery-round:v1';
+const DEFAULT_LOTTERY_ROUND = {
+  id: 1,
+  status: 'open',
+  winnerRequest: 'not_requested',
+  vrfRequestId: null,
+  chainlinkTxHash: null,
+  randomWord: null,
+  winningEntry: null,
+  prizeClaimStatus: 'not_ready',
+};
+
+function readLocalJson(key, fallback) {
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(key);
+    return storedValue ? JSON.parse(storedValue) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJson(key, value) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Demo persistence should never block the buyer flow.
+  }
+}
+
+function getInitialPurchases() {
+  const storedPurchases = readLocalJson(PURCHASES_STORAGE_KEY, []);
+  return Array.isArray(storedPurchases) ? storedPurchases : [];
+}
+
+function getInitialLotteryRound() {
+  const storedLotteryRound = readLocalJson(LOTTERY_ROUND_STORAGE_KEY, DEFAULT_LOTTERY_ROUND);
+  return storedLotteryRound && typeof storedLotteryRound === 'object' && !Array.isArray(storedLotteryRound)
+    ? { ...DEFAULT_LOTTERY_ROUND, ...storedLotteryRound }
+    : { ...DEFAULT_LOTTERY_ROUND };
+}
 
 function BlueprintFrame({ children, className = '' }) {
   return (
@@ -203,18 +252,19 @@ function SplitDiagram() {
   );
 }
 
-function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, paymentMethod, worldVerification, lotteryRound }) {
+function ReceiptPanel({ selectedCause, lastPurchase, selectedArt, worldVerification, lotteryRound }) {
   const proofLabel = lastPurchase?.worldProof?.startsWith('demo-')
     ? 'Demo proof recorded'
     : worldVerification.status === 'verified'
       ? 'World ID verified'
       : 'Pending';
   const rows = [
-    ['Total paid', `$${split.total}`],
-    ['Artist', `$${split.artist}`],
-    ['Social impact', `$${split.cause}`],
-    ['Lottery pool', `$${split.lottery}`],
+    ['Total paid', lastPurchase ? `$${lastPurchase.total}` : '$3'],
+    ['Artist', lastPurchase ? `$${lastPurchase.artist}` : '$1'],
+    ['Social impact', lastPurchase ? `$${lastPurchase.causeShare}` : '$1'],
+    ['Lottery pool', lastPurchase ? `$${lastPurchase.lottery}` : '$1'],
   ];
+  const receiptCause = lastPurchase?.cause ?? selectedCause.name;
 
   return (
     <BlueprintFrame className="p-5">
@@ -231,7 +281,7 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
           Artwork: {lastPurchase?.artTitle ?? selectedArt?.title ?? 'Choose art'}
         </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
-          Cause: {selectedCause.name}
+          Cause: {receiptCause}
         </div>
         <div className="mb-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
           Human proof: {proofLabel}
@@ -1187,18 +1237,9 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   const [ensIdentity, setEnsIdentity] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
-  const [purchases, setPurchases] = useState([]);
+  const [purchases, setPurchases] = useState(getInitialPurchases);
   const plays = purchases.length;
-  const [lotteryRound, setLotteryRound] = useState({
-    id: 1,
-    status: 'open',
-    winnerRequest: 'not_requested',
-    vrfRequestId: null,
-    chainlinkTxHash: null,
-    randomWord: null,
-    winningEntry: null,
-    prizeClaimStatus: 'not_ready',
-  });
+  const [lotteryRound, setLotteryRound] = useState(getInitialLotteryRound);
   const [activePage, setActivePage] = useState(() =>
     typeof window !== 'undefined' && window.location.hash === '#admin' ? 'admin' : 'site',
   );
@@ -1235,6 +1276,14 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     [causes, purchases],
   );
   const isAdminPage = activePage === 'admin';
+
+  useEffect(() => {
+    writeLocalJson(PURCHASES_STORAGE_KEY, purchases);
+  }, [purchases]);
+
+  useEffect(() => {
+    writeLocalJson(LOTTERY_ROUND_STORAGE_KEY, lotteryRound);
+  }, [lotteryRound]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1923,12 +1972,9 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
 
         <div className="mt-8">
           <ReceiptPanel
-            plays={plays}
             selectedCause={selectedCause}
-            split={split}
             lastPurchase={lastPurchase}
             selectedArt={selectedArt}
-            paymentMethod={paymentMethod === 'card' ? 'credit card' : 'crypto'}
             worldVerification={worldVerification}
             lotteryRound={lotteryRound}
           />
