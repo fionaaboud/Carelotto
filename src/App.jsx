@@ -811,7 +811,6 @@ function CheckoutPanel({
       purchases.some((purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id),
   );
   const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof && isRoundOpen);
-  const canRecordDemoPayment = Boolean(selectedArt || artOptions.length > 0);
   const participationStatus = !isRoundOpen
     ? 'Round closed'
     : !buyerSession
@@ -1184,8 +1183,7 @@ function CheckoutPanel({
             <button
               type="button"
               onClick={handleDemoPayment}
-              disabled={!canRecordDemoPayment}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-[#df8076] px-5 py-4 font-mono text-xs uppercase tracking-wider text-[#24221f] shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[#df8076] px-5 py-4 font-mono text-xs uppercase tracking-wider text-[#24221f] shadow-sm hover:brightness-95"
             >
               Demo: submit payment
             </button>
@@ -1913,6 +1911,21 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       email: buyerEmail.trim() || 'demo-buyer@carelotto.app',
       wallet: import.meta.env.VITE_DEMO_EMBEDDED_WALLET || '0x9a2c4d4f8f0c8f1c6a7a4f4e6f5b4c3d2e1a0b9c',
     };
+    const demoPurchase = {
+      ticketNumber: purchases.length + 1,
+      roundId: demoRound.id,
+      payoutWallet: demoBuyer.wallet,
+      artId: demoArt.id,
+      artTitle: demoArt.title,
+      buyerEmail: demoBuyer.email,
+      cause: selectedCause.name,
+      worldProof: `demo-${demoRound.id}-${Date.now()}`,
+      paymentMethod: paymentMethod === 'card' ? 'demo card payment' : 'demo crypto payment',
+      total: ticketPrice,
+      artist: 1,
+      causeShare: 1,
+      lottery: 1,
+    };
 
     if (!buyerSession) {
       setBuyerEmail(demoBuyer.email);
@@ -1928,13 +1941,23 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       setWorldProofSignal(null);
     }
 
-    recordPurchase({
-      worldProof: `demo-${demoRound.id}-${Date.now()}`,
-      paymentMethodLabel: paymentMethod === 'card' ? 'demo card payment' : 'demo crypto payment',
-      buyerOverride: demoBuyer,
-      roundOverride: demoRound,
-      artOverride: demoArt,
-    });
+    setSelectedArtId(demoArt.id);
+    setLastPurchase(demoPurchase);
+    setPurchases((current) => [...current, demoPurchase]);
+
+    insertCareLottoPurchase(demoPurchase)
+      .then((savedPurchase) => {
+        setLastPurchase(savedPurchase);
+        setPurchases((latestPurchases) =>
+          latestPurchases.map((purchase) => (purchase === demoPurchase ? savedPurchase : purchase)),
+        );
+        if (isSupabaseConfigured()) {
+          setRemoteStoreMessage('Demo payment saved to dashboard totals.');
+        }
+      })
+      .catch(() => {
+        setRemoteStoreMessage('Demo payment saved in browser. Supabase save failed.');
+      });
   }
 
   return (
