@@ -834,14 +834,16 @@ function CheckoutPanel({
                 }`}
               >
                 {art.image ? (
-                  <img
-                    src={art.image}
-                    alt={art.title}
-                    className="h-44 w-full rounded-xl border border-[#24221f]/15 object-cover"
-                  />
+                  <div className="grid h-64 place-items-center rounded-xl border border-[#24221f]/15 bg-white/65 p-2">
+                    <img
+                      src={art.image}
+                      alt={art.title}
+                      className="h-full w-full rounded-lg object-contain"
+                    />
+                  </div>
                 ) : (
                   <div
-                    className="h-44 rounded-xl border border-[#24221f]/15"
+                    className="h-64 rounded-xl border border-[#24221f]/15"
                     style={{ background: art.background }}
                     aria-hidden="true"
                   />
@@ -1061,6 +1063,20 @@ function CheckoutPanel({
               )}
             </div>
           ) : null}
+
+          <div className="mt-4 rounded-xl border border-[#df8076]/35 bg-white/70 p-3">
+            <button
+              type="button"
+              onClick={handleDemoPayment}
+              disabled={!canRecordDemoPayment}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[#df8076] px-5 py-4 font-mono text-xs uppercase tracking-wider text-[#24221f] shadow-sm hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Demo: submit payment
+            </button>
+            <p className="mt-2 text-sm leading-6 text-[#24221f]/65">
+              Use this for the presentation if World ID has already been verified or cannot be repeated live.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -1080,20 +1096,7 @@ function CheckoutPanel({
               : 'Complete steps above to unlock payment'}{' '}
           <ChevronRight className="ml-2 h-4 w-4" />
         </button>
-
-        <button
-          type="button"
-          onClick={handleDemoPayment}
-          disabled={!canRecordDemoPayment}
-          className="inline-flex w-full items-center justify-center rounded-2xl border border-[#24221f]/25 bg-[#fff8ea]/80 px-6 py-5 font-mono text-sm uppercase tracking-wider text-[#24221f] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-        >
-          Record demo payment
-        </button>
       </div>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-[#24221f]/65">
-        Use the demo button only for presentation mode if World ID has already been verified or the proof cannot be
-        repeated during the walkthrough.
-      </p>
 
     </BlueprintFrame>
   );
@@ -1129,10 +1132,10 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       description: 'Funds community health visits and patient support.',
     },
     {
-      name: 'Local artist fund',
-      wallet: '0x21...Arts',
-      category: 'Creative work',
-      description: 'Supports artists producing CareLotto receipt artwork.',
+      name: 'Bye Bye Plastic',
+      wallet: '0x21...Ocean',
+      category: 'Ocean cleanup',
+      description: 'Helps clean the ocean and remove single-use plastics in the music industry.',
     },
     {
       name: 'Mutual aid pantry',
