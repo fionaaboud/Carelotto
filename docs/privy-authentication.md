@@ -16,14 +16,36 @@ The app is wrapped in `PrivyProvider` when `VITE_PRIVY_APP_ID` is present. Check
 
 ## Environment
 
-Add the Privy app ID to `.env`:
+Create or open the app in the Privy Dashboard, then copy the app ID into `.env`:
 
 ```bash
 VITE_PRIVY_APP_ID=
 VITE_PRIVY_CLIENT_ID=
 ```
 
-`VITE_PRIVY_CLIENT_ID` is optional. Keep the app ID in local or Vercel environment variables, not hard-coded in source.
+`VITE_PRIVY_CLIENT_ID` is optional. Use it only when the Privy Dashboard gives this environment a dedicated app client.
+
+Keep Privy values in local or Vercel environment variables, not hard-coded in source. The browser app should only use `VITE_PRIVY_APP_ID` and optional `VITE_PRIVY_CLIENT_ID`; do not expose a Privy app secret in frontend code.
+
+## Dashboard Setup
+
+1. Create a Privy app for CareLotto.
+2. Enable email login.
+3. Enable embedded wallets.
+4. Allow the local demo origin, such as `http://localhost:5173`.
+5. Allow the deployed Vercel production and preview domains.
+6. Copy the app ID into local `.env` and Vercel as `VITE_PRIVY_APP_ID`.
+7. If using app clients, copy the client ID into `VITE_PRIVY_CLIENT_ID`.
+
+## Local Check
+
+Run this before a demo:
+
+```bash
+npm run env:check:privy
+```
+
+If `VITE_PRIVY_APP_ID` is missing, checkout intentionally shows a local demo wallet warning instead of looking like a real Privy flow.
 
 ## Acceptance Checklist
 
@@ -36,3 +58,5 @@ VITE_PRIVY_CLIENT_ID=
 - [x] Wrap the app in `PrivyProvider`.
 - [x] Replace the demo auth state with Privy `usePrivy` state.
 - [x] Keep a local demo fallback when `VITE_PRIVY_APP_ID` is missing.
+- [x] Make the checkout UI clearly say when Privy is missing.
+- [x] Add an environment check for demo readiness.

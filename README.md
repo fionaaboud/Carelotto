@@ -65,7 +65,19 @@ npm run check
 
 ## Environment
 
-Copy `.env.example` to `.env` when a feature needs local environment variables. The project does not require environment variables for the current frontend prototype.
+Copy `.env.example` to `.env` and fill in the integrations you want to demo. Privy turns on when `VITE_PRIVY_APP_ID` is present; otherwise checkout clearly uses the local demo wallet fallback.
+
+Run a general environment check:
+
+```bash
+npm run env:check
+```
+
+Run this before showing the real Privy email and embedded-wallet flow:
+
+```bash
+npm run env:check:privy
+```
 
 ## Vision
 

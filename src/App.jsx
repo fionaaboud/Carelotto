@@ -17,6 +17,12 @@ import {
 } from 'lucide-react';
 import { lookupEnsIdentity, shortenAddress } from './lib/ens';
 import {
+  fetchCareLottoState,
+  insertCareLottoPurchase,
+  isSupabaseConfigured,
+  saveCareLottoRound,
+} from './lib/supabaseStore';
+import {
   fetchWorldRpContext,
   getWorldProofId,
   getWorldProofSignal,
@@ -830,15 +836,15 @@ function CheckoutPanel({
         ? buyerAuthStep === 'code'
           ? 'Verify code'
           : 'Submit email'
-        : 'Submit email';
+        : 'Create demo wallet';
 
   return (
     <BlueprintFrame className="p-6 md:p-8">
       <div className="font-mono text-xs uppercase tracking-wider">Checkout flow</div>
       <h2 className="mt-3 font-serif text-4xl text-[#2f350d] md:text-5xl">Choose Art</h2>
       <p className="mt-4 max-w-2xl leading-8 text-[#24221f]/75">
-        The buyer starts with the heart, selects a receipt artwork, signs up with email through the Privy
-        flow, then pays by credit card or crypto.
+        The buyer starts with the heart, selects a receipt artwork, signs up with email, then pays by
+        credit card or crypto.
       </p>
 
       <div className="mt-8 grid gap-3 font-mono text-[10px] uppercase tracking-wider sm:grid-cols-5">
@@ -953,8 +959,17 @@ function CheckoutPanel({
           <StepHeading
             number="3"
             title="Email wallet signup"
-            helper="Enter your email. It creates the wallet where your image receipt and lottery ticket will live."
+            helper={
+              privyAuthEnabled
+                ? 'Enter your email. Privy creates the wallet where your image receipt and lottery ticket will live.'
+                : 'Privy is not connected in this environment. This creates a local demo wallet only.'
+            }
           />
+          {!privyAuthEnabled ? (
+            <div className="mt-4 rounded-xl border border-[#a85b52] bg-[#fff2ee] p-3 font-mono text-[10px] uppercase leading-5 tracking-wide text-[#7b3029]">
+              Add VITE_PRIVY_APP_ID to .env and restart the app before showing the real Privy email-code flow.
+            </div>
+          ) : null}
           <form onSubmit={handleBuyerSignup} className="mt-4 grid gap-3">
             <input
               type="email"
@@ -1208,7 +1223,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   const [buyerAuthMessage, setBuyerAuthMessage] = useState(
     privyAuth.enabled
       ? 'Privy will send a one-time email code and create the embedded wallet.'
-      : 'Enter your email to create the wallet session for your receipt and lottery ticket.',
+      : 'Privy is not configured. This checkout is using a local demo wallet.',
   );
   const [isBuyerAuthPending, setIsBuyerAuthPending] = useState(false);
   const [worldVerification, setWorldVerification] = useState({
@@ -1227,6 +1242,10 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   const [purchases, setPurchases] = useState(getInitialPurchases);
   const plays = purchases.length;
   const [lotteryRound, setLotteryRound] = useState(getInitialLotteryRound);
+  const [hasLoadedRemoteStore, setHasLoadedRemoteStore] = useState(!isSupabaseConfigured());
+  const [remoteStoreMessage, setRemoteStoreMessage] = useState(
+    isSupabaseConfigured() ? 'Loading shared Supabase totals...' : 'Using browser storage for demo totals.',
+  );
   const [activePage, setActivePage] = useState(() =>
     typeof window !== 'undefined' && window.location.hash === '#admin' ? 'admin' : 'site',
   );
@@ -1271,6 +1290,57 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   useEffect(() => {
     writeLocalJson(LOTTERY_ROUND_STORAGE_KEY, lotteryRound);
   }, [lotteryRound]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadRemoteStore() {
+      if (!isSupabaseConfigured()) {
+        return;
+      }
+
+      try {
+        const remoteState = await fetchCareLottoState();
+
+        if (!isMounted || !remoteState) {
+          return;
+        }
+
+        setPurchases(remoteState.purchases);
+        if (remoteState.lotteryRound) {
+          setLotteryRound((currentRound) => ({
+            ...currentRound,
+            ...remoteState.lotteryRound,
+          }));
+        }
+        setRemoteStoreMessage('Shared Supabase totals loaded.');
+      } catch (error) {
+        if (isMounted) {
+          setRemoteStoreMessage('Supabase unavailable. Using browser storage for this session.');
+        }
+      } finally {
+        if (isMounted) {
+          setHasLoadedRemoteStore(true);
+        }
+      }
+    }
+
+    loadRemoteStore();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !hasLoadedRemoteStore) {
+      return;
+    }
+
+    saveCareLottoRound(lotteryRound).catch(() => {
+      setRemoteStoreMessage('Lottery round saved in browser. Supabase save failed.');
+    });
+  }, [hasLoadedRemoteStore, lotteryRound]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1344,7 +1414,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
 
   useEffect(() => {
     if (!privyAuth.enabled) {
-      setBuyerAuthMessage('Enter your email to create the wallet session for your receipt and lottery ticket.');
+      setBuyerAuthMessage('Privy is not configured. This checkout is using a local demo wallet.');
       return;
     }
 
@@ -1664,32 +1734,43 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     }));
   }
 
-  function recordPurchase({ worldProof, paymentMethodLabel }) {
+  async function recordPurchase({ worldProof, paymentMethodLabel }) {
     if (!buyerSession || !selectedArt || lotteryRound.status !== 'open') {
       return;
     }
 
-    setPurchases((current) => {
-      const ticketNumber = current.length + 1;
-      const purchase = {
-        ticketNumber,
-        roundId: lotteryRound.id,
-        payoutWallet: buyerSession.wallet,
-        artId: selectedArt.id,
-        artTitle: selectedArt.title,
-        buyerEmail: buyerSession.email,
-        cause: selectedCause.name,
-        worldProof,
-        paymentMethod: paymentMethodLabel,
-        total: ticketPrice,
-        artist: 1,
-        causeShare: 1,
-        lottery: 1,
-      };
+    const purchase = {
+      ticketNumber: purchases.length + 1,
+      roundId: lotteryRound.id,
+      payoutWallet: buyerSession.wallet,
+      artId: selectedArt.id,
+      artTitle: selectedArt.title,
+      buyerEmail: buyerSession.email,
+      cause: selectedCause.name,
+      worldProof,
+      paymentMethod: paymentMethodLabel,
+      total: ticketPrice,
+      artist: 1,
+      causeShare: 1,
+      lottery: 1,
+    };
 
-      setLastPurchase(purchase);
-      return [...current, purchase];
-    });
+    setLastPurchase(purchase);
+    setPurchases((current) => [...current, purchase]);
+
+    try {
+      const savedPurchase = await insertCareLottoPurchase(purchase);
+
+      setLastPurchase(savedPurchase);
+      setPurchases((current) =>
+        current.map((currentPurchase) => (currentPurchase === purchase ? savedPurchase : currentPurchase)),
+      );
+      if (isSupabaseConfigured()) {
+        setRemoteStoreMessage('Purchase saved to Supabase shared totals.');
+      }
+    } catch (error) {
+      setRemoteStoreMessage('Purchase saved in browser. Supabase save failed.');
+    }
   }
 
   function handlePurchase() {
@@ -1788,7 +1869,7 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
                 Admin dashboard
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-[#24221f]/75">
-                Close sales, ask Chainlink to select the winner, and track the prize payout from one focused place.
+                Close sales, pick the prize winner, and track the prize payout from one focused place.
               </p>
             </div>
           </section>

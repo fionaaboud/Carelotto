@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "npm run build && npm run contracts:validate",
+    "env:check": "node scripts/validate-env.js",
+    "env:check:privy": "node scripts/validate-env.js --require-privy",
     "contracts:validate": "node scripts/validate-contracts.js",
     "contracts:compile": "hardhat compile",
     "contracts:deploy:local": "hardhat run scripts/deploy-carelotto-split.js --network hardhatMainnet",
