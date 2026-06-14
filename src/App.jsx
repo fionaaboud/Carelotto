@@ -811,7 +811,7 @@ function CheckoutPanel({
       purchases.some((purchase) => purchase.worldProof === worldVerification.proofId && purchase.roundId === lotteryRound.id),
   );
   const canPay = Boolean(selectedArt && buyerSession && isHumanVerified && !hasUsedWorldProof && isRoundOpen);
-  const canRecordDemoPayment = Boolean(selectedArt && isRoundOpen);
+  const canRecordDemoPayment = Boolean(selectedArt || artOptions.length > 0);
   const participationStatus = !isRoundOpen
     ? 'Round closed'
     : !buyerSession
@@ -1825,19 +1825,21 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     }));
   }
 
-  async function recordPurchase({ worldProof, paymentMethodLabel, buyerOverride }) {
+  async function recordPurchase({ worldProof, paymentMethodLabel, buyerOverride, roundOverride, artOverride }) {
     const purchaseBuyer = buyerOverride ?? buyerSession;
+    const purchaseRound = roundOverride ?? lotteryRound;
+    const purchaseArt = artOverride ?? selectedArt;
 
-    if (!purchaseBuyer || !selectedArt || lotteryRound.status !== 'open') {
+    if (!purchaseBuyer || !purchaseArt || purchaseRound.status !== 'open') {
       return;
     }
 
     const purchase = {
       ticketNumber: purchases.length + 1,
-      roundId: lotteryRound.id,
+      roundId: purchaseRound.id,
       payoutWallet: purchaseBuyer.wallet,
-      artId: selectedArt.id,
-      artTitle: selectedArt.title,
+      artId: purchaseArt.id,
+      artTitle: purchaseArt.title,
       buyerEmail: purchaseBuyer.email,
       cause: selectedCause.name,
       worldProof,
@@ -1888,8 +1890,23 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   }
 
   function handleDemoPayment() {
-    if (!selectedArt || lotteryRound.status !== 'open') {
+    const demoArt = selectedArt ?? artOptions[0];
+
+    if (!demoArt) {
       return;
+    }
+
+    const demoRound =
+      lotteryRound.status === 'open'
+        ? lotteryRound
+        : {
+            ...DEFAULT_LOTTERY_ROUND,
+            id: lotteryRound.id + 1,
+          };
+
+    if (lotteryRound.status !== 'open') {
+      setLotteryRound(demoRound);
+      setChainlinkRequestMessage('Demo checkout opened a fresh lottery round for the presentation.');
     }
 
     const demoBuyer = buyerSession ?? {
@@ -1912,9 +1929,11 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     }
 
     recordPurchase({
-      worldProof: `demo-${lotteryRound.id}-${Date.now()}`,
+      worldProof: `demo-${demoRound.id}-${Date.now()}`,
       paymentMethodLabel: paymentMethod === 'card' ? 'demo card payment' : 'demo crypto payment',
       buyerOverride: demoBuyer,
+      roundOverride: demoRound,
+      artOverride: demoArt,
     });
   }
 
