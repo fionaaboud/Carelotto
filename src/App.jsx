@@ -1187,9 +1187,6 @@ function CheckoutPanel({
             >
               Demo: submit payment
             </button>
-            <p className="mt-2 text-sm leading-6 text-[#24221f]/65">
-              Use this for the presentation if Privy, World ID, or checkout cannot be repeated live.
-            </p>
           </div>
         </div>
       </div>
