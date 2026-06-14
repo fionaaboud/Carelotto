@@ -15,7 +15,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import { lookupEnsIdentity, lookupEnsName, shortenAddress } from './lib/ens';
+import { lookupEnsIdentity, shortenAddress } from './lib/ens';
 import {
   fetchWorldRpContext,
   getWorldProofId,
@@ -319,7 +319,6 @@ function CheckoutPanel({
   connectedWallet,
   handleConnectWallet,
   ensIdentity,
-  appEnsIdentity,
   paymentMethod,
   setPaymentMethod,
   purchases,
@@ -351,9 +350,14 @@ function CheckoutPanel({
       : isHumanVerified
       ? 'This buyer can participate in the receipt lottery once.'
       : 'World ID proof protects the lottery pool from duplicate or automated entries.';
-  const ensDisplayName = ensIdentity?.displayName ?? (connectedWallet ? shortenAddress(connectedWallet.address) : null);
-  const ensTextRecords = ensIdentity?.textRecords ?? {};
-  const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
+  const walletDisplayName = ensIdentity?.displayName ?? (connectedWallet ? shortenAddress(connectedWallet.address) : null);
+  const walletAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
+  const walletIdentityStatus =
+    ensIdentity?.status === 'resolved'
+      ? 'ENS name found'
+      : ensIdentity?.status === 'loading'
+        ? 'Checking ENS'
+        : 'Address fallback';
   const signupButtonLabel = buyerSession
     ? 'Connected'
     : isBuyerAuthPending
@@ -562,7 +566,7 @@ function CheckoutPanel({
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_.9fr]">
+      <div className="mt-8">
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
           <StepHeading number="5" title="Payment method" helper="Choose card for the demo path or crypto wallet for later." />
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -587,14 +591,38 @@ function CheckoutPanel({
           <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-3 font-mono text-[10px] uppercase tracking-wide">
             {paymentMethod === 'crypto' ? (
               connectedWallet ? (
-                <div className="grid gap-2">
-                  <div className="flex justify-between gap-4">
-                    <span>Connected wallet</span>
-                    <span>{connectedWallet.address}</span>
+                <div className="grid gap-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[#24221f]/20 font-serif text-lg text-[#f2ead9]"
+                      style={{
+                        background:
+                          'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
+                      }}
+                    >
+                      {walletAvatarIsImage ? (
+                        <img src={ensIdentity.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+                      ) : (
+                        ensIdentity?.avatarLabel ?? 'CL'
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-serif text-2xl normal-case tracking-normal text-[#2f350d]">
+                        {walletDisplayName}
+                      </div>
+                      <div className="mt-1 text-[#24221f]/55">{walletIdentityStatus}</div>
+                    </div>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span>Network</span>
-                    <span>{connectedWallet.network}</span>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg border border-[#24221f]/15 bg-[#fff8ea]/70 p-3">
+                      <div className="text-[#24221f]/55">Wallet</div>
+                      <div className="mt-1">{shortenAddress(connectedWallet.address)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#24221f]/15 bg-[#fff8ea]/70 p-3">
+                      <div className="text-[#24221f]/55">Network</div>
+                      <div className="mt-1">{connectedWallet.network}</div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -610,78 +638,6 @@ function CheckoutPanel({
               <div>Card checkout placeholder. Crypto wallet can be connected later.</div>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-        <div className="font-mono text-xs uppercase tracking-wider">Wallet identity</div>
-        <div className="mt-3 grid gap-3 font-mono text-[10px] uppercase tracking-wide md:grid-cols-3">
-          <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-            <div className="text-[#24221f]/55">Privy embedded wallet</div>
-            <div className="mt-2">{buyerSession ? shortenAddress(buyerSession.wallet) : 'Created after email signup'}</div>
-          </div>
-          <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-            <div className="text-[#24221f]/55">External crypto wallet</div>
-            <div className="mt-2">{connectedWallet ? shortenAddress(connectedWallet.address) : 'Not connected'}</div>
-          </div>
-          <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-            <div className="text-[#24221f]/55">ENS status</div>
-            <div className="mt-2">
-              {ensIdentity?.status === 'loading'
-                ? 'Resolving...'
-                : ensIdentity?.status === 'resolved'
-                  ? ensIdentity.name
-                  : connectedWallet
-                    ? 'Address fallback'
-                    : 'Connect wallet first'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-        <div className="font-mono text-xs uppercase tracking-wider">ENS resolution</div>
-        <div className="mt-3 flex flex-col gap-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-4 sm:flex-row sm:items-center">
-          <div
-            className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-[#24221f]/20 font-serif text-2xl text-[#f2ead9]"
-            style={{
-              background:
-                'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
-            }}
-          >
-            {ensAvatarIsImage ? (
-              <img src={ensIdentity.avatar} alt="" className="h-full w-full rounded-full object-cover" />
-            ) : (
-              ensIdentity?.avatarLabel ?? 'CL'
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-serif text-3xl leading-tight text-[#2f350d]">
-              {ensDisplayName ?? 'No wallet connected'}
-            </div>
-            <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-              {ensIdentity?.message ?? 'Fallback will show shortened wallet address until ENS resolves.'}
-            </div>
-            {Object.keys(ensTextRecords).length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/65">
-                {Object.entries(ensTextRecords)
-                  .filter(([key]) => key !== 'avatar')
-                  .map(([key, value]) => (
-                    <span key={key} className="rounded-full border border-[#24221f]/15 px-2 py-1">
-                      {key}: {value}
-                    </span>
-                  ))}
-              </div>
-            ) : null}
-            {appEnsIdentity ? (
-              <div className="mt-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
-                App identity: {appEnsIdentity.name} resolves to {shortenAddress(appEnsIdentity.address)}
-              </div>
-            ) : null}
-          </div>
-          <span className="rounded-full border border-[#24221f]/20 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
-            {ensIdentity?.status === 'resolved' ? 'Resolved' : ensIdentity?.status === 'loading' ? 'Resolving' : 'Fallback'}
-          </span>
         </div>
       </div>
 
@@ -709,129 +665,6 @@ function CheckoutPanel({
   );
 }
 
-function CareProfile({
-  ensIdentity,
-  appEnsIdentity,
-  connectedWallet,
-  buyerSession,
-  worldVerification,
-  purchases,
-  split,
-  selectedArt,
-  selectedCause,
-}) {
-  const displayName =
-    ensIdentity?.displayName ??
-    (connectedWallet ? shortenAddress(connectedWallet.address) : null) ??
-    (buyerSession ? shortenAddress(buyerSession.wallet) : null) ??
-    'Connect to build profile';
-  const latestPurchase = purchases[purchases.length - 1];
-  const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
-  const profileDescription = ensIdentity?.textRecords?.description;
-
-  return (
-    <section id="profile" className="mx-auto max-w-7xl px-6 py-16">
-      <BlueprintFrame className="p-6 md:p-8">
-        <div className="grid gap-8 lg:grid-cols-[.75fr_1.25fr]">
-          <div>
-            <div className="font-mono text-xs uppercase tracking-wider">ENS care profile</div>
-            <div className="mt-4 flex items-center gap-4">
-              <div
-                className="grid h-20 w-20 shrink-0 place-items-center rounded-full border border-[#24221f]/20 font-serif text-3xl text-[#f2ead9]"
-                style={{
-                  background:
-                    'radial-gradient(circle at 32% 28%, #df8076 0 18%, transparent 34%), linear-gradient(135deg, #3f4513, #69713a)',
-                }}
-              >
-                {ensAvatarIsImage ? (
-                  <img src={ensIdentity.avatar} alt="" className="h-full w-full rounded-full object-cover" />
-                ) : (
-                  ensIdentity?.avatarLabel ?? 'CL'
-                )}
-              </div>
-              <div>
-                <h2 className="font-serif text-4xl leading-tight text-[#2f350d]">{displayName}</h2>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-                  {ensIdentity?.status === 'resolved' ? 'Resolved ENS care identity' : 'Wallet fallback profile'}
-                </div>
-              </div>
-            </div>
-            <p className="mt-5 leading-8 text-[#24221f]/75">
-              {profileDescription ||
-                'This profile turns a buyer wallet into a public care trail: artwork collected, causes supported, and lottery participation in one judge-friendly view.'}
-            </p>
-            {appEnsIdentity ? (
-              <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-[#fff8ea]/70 p-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-                CareLotto operator ENS: {appEnsIdentity.name} {'->'} {shortenAddress(appEnsIdentity.address)}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-4">
-              {[
-                ['Receipts', purchases.length],
-                ['Artist', `$${split.artist}`],
-                ['Causes', `$${split.cause}`],
-                ['Lottery', `$${split.lottery}`],
-                ['Human', worldVerification.status === 'verified' ? 'Yes' : 'No'],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
-                  <div className="mt-2 font-serif text-3xl text-[#2f350d]">{value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                <div className="font-mono text-xs uppercase tracking-wider">Current intent</div>
-                <div className="mt-3 font-serif text-2xl">{selectedArt.title}</div>
-                <div className="mt-2 text-sm leading-6 text-[#24221f]/70">{selectedArt.description}</div>
-                <div className="mt-4 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
-                  Supporting {selectedCause.name}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                <div className="font-mono text-xs uppercase tracking-wider">Latest receipt</div>
-                {latestPurchase ? (
-                  <div className="mt-3 grid gap-2 font-mono text-[10px] uppercase tracking-wide">
-                    <div className="flex justify-between gap-4">
-                      <span>Ticket</span>
-                      <span>{String(latestPurchase.ticketNumber).padStart(3, '0')}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span>Artwork</span>
-                      <span>{latestPurchase.artTitle}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span>Cause</span>
-                      <span>{latestPurchase.cause}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span>Payment</span>
-                      <span>{latestPurchase.paymentMethod}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span>World ID</span>
-                      <span>{latestPurchase.worldProof ? 'verified' : 'pending'}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm leading-6 text-[#24221f]/70">
-                    Complete a demo purchase to populate receipt history.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </BlueprintFrame>
-    </section>
-  );
-}
-
 export default function App({ privyAuth = { enabled: false, ready: false, authenticated: false } }) {
   const ticketPrice = 3;
   const artOptions = [
@@ -852,27 +685,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       title: 'Rise',
       description: 'A blue-and-yellow heart supporting families affected by the war in Ukraine.',
       image: '/art/rise.jpg',
-    },
-    {
-      id: 'bloom',
-      title: 'Care Bloom',
-      description: 'Soft receipt artwork with petals, pools, and care signals.',
-      background:
-        'radial-gradient(circle at 25% 25%, #df8076 0 12%, transparent 28%), radial-gradient(circle at 75% 35%, #f2ead9 0 10%, transparent 26%), linear-gradient(135deg, #8da05a, #efe0c4)',
-    },
-    {
-      id: 'signal',
-      title: 'Signal Field',
-      description: 'A graphic field that feels like a public-good transmission.',
-      background:
-        'linear-gradient(135deg, rgba(63,69,19,.95), rgba(223,128,118,.72)), repeating-linear-gradient(90deg, transparent 0 16px, rgba(255,255,255,.22) 16px 18px)',
-    },
-    {
-      id: 'garden',
-      title: 'Mutual Garden',
-      description: 'Layered greens and pinks for a receipt that feels alive.',
-      background:
-        'radial-gradient(circle at 20% 70%, #69713a 0 18%, transparent 34%), radial-gradient(circle at 75% 25%, #df8076 0 14%, transparent 30%), linear-gradient(160deg, #f2ead9, #9aa36b)',
     },
   ];
   const causes = [
@@ -925,7 +737,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
   const [isWorldRequestPending, setIsWorldRequestPending] = useState(false);
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [ensIdentity, setEnsIdentity] = useState(null);
-  const [appEnsIdentity, setAppEnsIdentity] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [lastPurchase, setLastPurchase] = useState(null);
   const [purchases, setPurchases] = useState([]);
@@ -1010,27 +821,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       isMounted = false;
     };
   }, [connectedWallet]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const operatorName = import.meta.env.VITE_OPERATOR_ENS_NAME || 'carelotto.eth';
-
-    lookupEnsName(operatorName)
-      .then((identity) => {
-        if (isMounted) {
-          setAppEnsIdentity(identity);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setAppEnsIdentity(null);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!privyAuth.enabled) {
@@ -1428,7 +1218,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         <div className="hidden gap-6 md:flex">
           <a href="#how">How it works</a>
           <a href="#impact">Impact</a>
-          <a href="#profile">Profile</a>
           <a href="#play">Play</a>
         </div>
         <a href="#play" className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5">
@@ -1512,7 +1301,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           connectedWallet={connectedWallet}
           handleConnectWallet={handleConnectWallet}
           ensIdentity={ensIdentity}
-          appEnsIdentity={appEnsIdentity}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}
           purchases={purchases}
@@ -1533,18 +1321,6 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           />
         </div>
       </section>
-
-      <CareProfile
-        ensIdentity={ensIdentity}
-        appEnsIdentity={appEnsIdentity}
-        connectedWallet={connectedWallet}
-        buyerSession={buyerSession}
-        worldVerification={worldVerification}
-        purchases={purchases}
-        split={split}
-        selectedArt={selectedArt}
-        selectedCause={selectedCause}
-      />
 
       <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
         <BlueprintFrame className="p-6 md:p-8">
