@@ -1041,7 +1041,7 @@ function CheckoutPanel({
                     </div>
                   ) : null}
                   <div className="mt-3 text-sm leading-6 text-[#24221f]/70">
-                    This wallet will hold the art receipt, lottery ticket, and winner payout address.
+                    Your art receipt and lottery ticket will be assigned to this wallet.
                   </div>
                 </div>
               </div>
