@@ -5,6 +5,8 @@ node_modules/
 dist/
 out/
 .vite/
+artifacts/
+cache/
 
 # Logs
 logs/

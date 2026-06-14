@@ -1,14 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+
 /// @title CareLottoSplit
-/// @notice Splits each image purchase between the artist, a social impact cause, and a lottery pool.
-contract CareLottoSplit {
-    address public owner;
+/// @notice Splits each image purchase between the artist, a social impact cause, and a Chainlink VRF lottery pool.
+contract CareLottoSplit is VRFConsumerBaseV2Plus {
     address public artistWallet;
     uint256 public totalImagesPurchased;
     uint256 public totalLotteryPool;
     uint256 public currentRoundId;
+    uint256 public vrfSubscriptionId;
+    bytes32 public vrfKeyHash;
+    uint32 public vrfCallbackGasLimit;
+    bool public vrfNativePayment;
+
+    uint16 public constant VRF_REQUEST_CONFIRMATIONS = 3;
+    uint32 public constant VRF_NUM_WORDS = 1;
 
     struct CauseStats {
         uint256 totalReceived;
@@ -25,10 +34,12 @@ contract CareLottoSplit {
         uint256 vrfRequestId;
         uint256 randomWord;
         address winner;
+        bool prizeClaimed;
     }
 
     mapping(address => CauseStats) public causeStats;
     mapping(uint256 => LotteryRound) public lotteryRounds;
+    mapping(uint256 => uint256) public vrfRequestRoundIds;
     mapping(uint256 => address[]) private lotteryRoundEntries;
 
     event ImagePurchased(
@@ -53,27 +64,46 @@ contract CareLottoSplit {
         uint256 winningEntryIndex,
         uint256 randomWord
     );
-    event LotteryPrizeWithdrawn(address indexed winner, uint256 amount);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event LotteryPrizeWithdrawn(uint256 indexed roundId, address indexed winner, uint256 amount);
+    event VrfConfigUpdated(
+        uint256 subscriptionId,
+        bytes32 keyHash,
+        uint32 callbackGasLimit,
+        bool nativePayment
+    );
 
     error InvalidAddress();
     error InvalidPayment();
     error TransferFailed();
     error Unauthorized();
     error InsufficientLotteryPool();
-    error LotteryRoundClosed();
+    error LotteryRoundAlreadyClosed();
     error LotteryRoundStillOpen();
+    error EmptyLotteryRound();
+    error WinnerAlreadyRequested();
+    error WinnerAlreadySelected();
+    error WinnerNotSelected();
+    error PrizeAlreadyClaimed();
+    error UnknownVrfRequest();
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert Unauthorized();
-        _;
-    }
-
-    constructor(address initialArtistWallet) {
+    constructor(
+        address initialArtistWallet,
+        uint256 initialVrfSubscriptionId,
+        address initialVrfCoordinator,
+        bytes32 initialVrfKeyHash,
+        uint32 initialVrfCallbackGasLimit,
+        bool initialVrfNativePayment
+    ) VRFConsumerBaseV2Plus(initialVrfCoordinator) {
         if (initialArtistWallet == address(0)) revert InvalidAddress();
+        if (initialVrfCoordinator == address(0)) revert InvalidAddress();
+        if (initialVrfKeyHash == bytes32(0)) revert InvalidPayment();
+        if (initialVrfCallbackGasLimit == 0) revert InvalidPayment();
 
-        owner = msg.sender;
         artistWallet = initialArtistWallet;
+        vrfSubscriptionId = initialVrfSubscriptionId;
+        vrfKeyHash = initialVrfKeyHash;
+        vrfCallbackGasLimit = initialVrfCallbackGasLimit;
+        vrfNativePayment = initialVrfNativePayment;
         currentRoundId = 1;
         lotteryRounds[currentRoundId] = LotteryRound({
             id: currentRoundId,
@@ -83,18 +113,24 @@ contract CareLottoSplit {
             winnerRequested: false,
             vrfRequestId: 0,
             randomWord: 0,
-            winner: address(0)
+            winner: address(0),
+            prizeClaimed: false
         });
 
-        emit OwnershipTransferred(address(0), msg.sender);
         emit LotteryRoundOpened(currentRoundId);
+        emit VrfConfigUpdated(
+            initialVrfSubscriptionId,
+            initialVrfKeyHash,
+            initialVrfCallbackGasLimit,
+            initialVrfNativePayment
+        );
     }
 
     function purchaseImage(address buyerWallet, address socialImpactCause, bytes32 imageId) external payable {
         if (msg.value == 0) revert InvalidPayment();
         if (buyerWallet == address(0)) revert InvalidAddress();
         if (socialImpactCause == address(0)) revert InvalidAddress();
-        if (!lotteryRounds[currentRoundId].isOpen) revert LotteryRoundClosed();
+        if (!lotteryRounds[currentRoundId].isOpen) revert LotteryRoundAlreadyClosed();
 
         uint256 artistShare = msg.value / 3;
         uint256 causeShare = msg.value / 3;
@@ -129,39 +165,43 @@ contract CareLottoSplit {
 
     function closeCurrentLotteryRound() external onlyOwner {
         LotteryRound storage round = lotteryRounds[currentRoundId];
-        if (!round.isOpen) revert LotteryRoundClosed();
+        if (!round.isOpen) revert LotteryRoundAlreadyClosed();
 
         round.isOpen = false;
 
         emit LotteryRoundClosed(currentRoundId, round.entryCount, round.pool);
     }
 
-    function requestLotteryWinner(uint256 requestId) external onlyOwner {
+    function requestLotteryWinner() external onlyOwner returns (uint256 requestId) {
         LotteryRound storage round = lotteryRounds[currentRoundId];
         if (round.isOpen) revert LotteryRoundStillOpen();
+        if (round.entryCount == 0) revert EmptyLotteryRound();
+        if (round.winnerRequested) revert WinnerAlreadyRequested();
+
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: vrfKeyHash,
+                subId: vrfSubscriptionId,
+                requestConfirmations: VRF_REQUEST_CONFIRMATIONS,
+                callbackGasLimit: vrfCallbackGasLimit,
+                numWords: VRF_NUM_WORDS,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: vrfNativePayment})
+                )
+            })
+        );
 
         round.winnerRequested = true;
         round.vrfRequestId = requestId;
+        vrfRequestRoundIds[requestId] = currentRoundId;
 
         emit LotteryWinnerRequested(currentRoundId, requestId);
     }
 
-    function recordLotteryWinner(uint256 roundId, uint256 randomWord) external onlyOwner {
-        LotteryRound storage round = lotteryRounds[roundId];
-        if (round.isOpen) revert LotteryRoundStillOpen();
-        if (round.entryCount == 0) revert InvalidPayment();
-
-        uint256 winningEntryIndex = randomWord % round.entryCount;
-        address winner = lotteryRoundEntries[roundId][winningEntryIndex];
-
-        round.randomWord = randomWord;
-        round.winner = winner;
-
-        emit LotteryWinnerSelected(roundId, round.vrfRequestId, winner, winningEntryIndex, randomWord);
-    }
-
     function openNextLotteryRound() external onlyOwner {
-        if (lotteryRounds[currentRoundId].isOpen) revert LotteryRoundStillOpen();
+        LotteryRound storage round = lotteryRounds[currentRoundId];
+        if (round.isOpen) revert LotteryRoundStillOpen();
+        if (round.entryCount > 0 && round.winner == address(0)) revert WinnerNotSelected();
 
         currentRoundId += 1;
         lotteryRounds[currentRoundId] = LotteryRound({
@@ -172,10 +212,28 @@ contract CareLottoSplit {
             winnerRequested: false,
             vrfRequestId: 0,
             randomWord: 0,
-            winner: address(0)
+            winner: address(0),
+            prizeClaimed: false
         });
 
         emit LotteryRoundOpened(currentRoundId);
+    }
+
+    function claimLotteryPrize(uint256 roundId) external {
+        LotteryRound storage round = lotteryRounds[roundId];
+        if (round.winner == address(0)) revert WinnerNotSelected();
+        if (msg.sender != round.winner) revert Unauthorized();
+        if (round.prizeClaimed) revert PrizeAlreadyClaimed();
+        if (round.pool == 0) revert InsufficientLotteryPool();
+
+        uint256 amount = round.pool;
+        round.prizeClaimed = true;
+        round.pool = 0;
+        totalLotteryPool -= amount;
+
+        _sendValue(msg.sender, amount);
+
+        emit LotteryPrizeWithdrawn(roundId, msg.sender, amount);
     }
 
     function getLotteryRoundEntry(uint256 roundId, uint256 index) external view returns (address) {
@@ -195,6 +253,23 @@ contract CareLottoSplit {
         emit ArtistWalletUpdated(previousWallet, newArtistWallet);
     }
 
+    function setVrfConfig(
+        uint256 newSubscriptionId,
+        bytes32 newKeyHash,
+        uint32 newCallbackGasLimit,
+        bool newNativePayment
+    ) external onlyOwner {
+        if (newKeyHash == bytes32(0)) revert InvalidPayment();
+        if (newCallbackGasLimit == 0) revert InvalidPayment();
+
+        vrfSubscriptionId = newSubscriptionId;
+        vrfKeyHash = newKeyHash;
+        vrfCallbackGasLimit = newCallbackGasLimit;
+        vrfNativePayment = newNativePayment;
+
+        emit VrfConfigUpdated(newSubscriptionId, newKeyHash, newCallbackGasLimit, newNativePayment);
+    }
+
     function withdrawLotteryPrize(address winner, uint256 amount) external onlyOwner {
         if (winner == address(0)) revert InvalidAddress();
         if (amount > totalLotteryPool) revert InsufficientLotteryPool();
@@ -202,20 +277,33 @@ contract CareLottoSplit {
         totalLotteryPool -= amount;
         _sendValue(winner, amount);
 
-        emit LotteryPrizeWithdrawn(winner, amount);
+        emit LotteryPrizeWithdrawn(0, winner, amount);
     }
 
-    function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert InvalidAddress();
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
+        uint256 roundId = vrfRequestRoundIds[requestId];
+        if (roundId == 0) revert UnknownVrfRequest();
 
-        address previousOwner = owner;
-        owner = newOwner;
+        _recordLotteryWinner(roundId, requestId, randomWords[0]);
+    }
 
-        emit OwnershipTransferred(previousOwner, newOwner);
+    function _recordLotteryWinner(uint256 roundId, uint256 requestId, uint256 randomWord) private {
+        LotteryRound storage round = lotteryRounds[roundId];
+        if (round.isOpen) revert LotteryRoundStillOpen();
+        if (round.entryCount == 0) revert EmptyLotteryRound();
+        if (round.winner != address(0)) revert WinnerAlreadySelected();
+
+        uint256 winningEntryIndex = randomWord % round.entryCount;
+        address winner = lotteryRoundEntries[roundId][winningEntryIndex];
+
+        round.randomWord = randomWord;
+        round.winner = winner;
+
+        emit LotteryWinnerSelected(roundId, requestId, winner, winningEntryIndex, randomWord);
     }
 
     function _sendValue(address recipient, uint256 amount) private {
-        (bool success, ) = recipient.call{ value: amount }('');
+        (bool success, ) = recipient.call{value: amount}('');
         if (!success) revert TransferFailed();
     }
 }

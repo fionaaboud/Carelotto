@@ -11,9 +11,12 @@
     "contracts:validate": "node scripts/validate-contracts.js",
     "contracts:compile": "hardhat compile",
     "contracts:deploy:local": "hardhat run scripts/deploy-carelotto-split.js --network hardhatMainnet",
+    "contracts:deploy:sepolia": "hardhat run scripts/deploy-carelotto-split.js --network sepolia",
     "world:dev-server": "node scripts/world-id-dev-server.js"
   },
   "dependencies": {
+    "@chainlink/contracts": "^1.4.0",
+    "@privy-io/react-auth": "^3.30.0",
     "@worldcoin/idkit": "^4.1.8",
     "framer-motion": "^12.0.0",
     "lucide-react": "^0.468.0",

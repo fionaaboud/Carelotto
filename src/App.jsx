@@ -35,6 +35,9 @@ const palette = {
   ink: '#24221f',
 };
 
+const REQUEST_LOTTERY_WINNER_CALLDATA = '0x5352619d';
+const SEPOLIA_CHAIN_ID = '0xaa36a7';
+
 function BlueprintFrame({ children, className = '' }) {
   return (
     <div
@@ -287,7 +290,14 @@ function CheckoutPanel({
   setSelectedCauseName,
   buyerEmail,
   setBuyerEmail,
+  buyerCode,
+  setBuyerCode,
   buyerSession,
+  buyerAuthStep,
+  buyerAuthMessage,
+  isBuyerAuthPending,
+  privyAuthEnabled,
+  privyReady,
   handleBuyerSignup,
   worldVerification,
   handleWorldVerification,
@@ -330,13 +340,22 @@ function CheckoutPanel({
   const ensDisplayName = ensIdentity?.displayName ?? (connectedWallet ? shortenAddress(connectedWallet.address) : null);
   const ensTextRecords = ensIdentity?.textRecords ?? {};
   const ensAvatarIsImage = Boolean(ensIdentity?.avatar?.startsWith('http'));
+  const signupButtonLabel = buyerSession
+    ? 'Connected'
+    : isBuyerAuthPending
+      ? 'Working'
+      : privyAuthEnabled
+        ? buyerAuthStep === 'code'
+          ? 'Verify code'
+          : 'Send code'
+        : 'Continue demo';
 
   return (
     <BlueprintFrame className="p-6 md:p-8">
       <div className="font-mono text-xs uppercase tracking-wider">Checkout flow</div>
       <h2 className="mt-3 font-serif text-4xl text-[#2f350d] md:text-5xl">Press heart. Choose art. Pay your way.</h2>
       <p className="mt-4 max-w-2xl leading-8 text-[#24221f]/75">
-        The buyer starts with the heart, selects a receipt artwork, signs up with email through the Privy-ready
+        The buyer starts with the heart, selects a receipt artwork, signs up with email through the Privy
         flow, then pays by credit card or crypto.
       </p>
 
@@ -459,25 +478,37 @@ function CheckoutPanel({
       <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_.9fr]">
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
           <div className="font-mono text-xs uppercase tracking-wider">Privy email signup</div>
-          <form onSubmit={handleBuyerSignup} className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <form onSubmit={handleBuyerSignup} className="mt-3 grid gap-3 md:grid-cols-[1fr_.65fr_auto]">
             <input
               type="email"
               value={buyerEmail}
               onChange={(event) => setBuyerEmail(event.target.value)}
+              disabled={Boolean(buyerSession)}
               placeholder="email@example.com"
               className="min-h-12 rounded-xl border border-[#24221f]/25 bg-white px-4"
             />
+            {buyerAuthStep === 'code' ? (
+              <input
+                type="text"
+                inputMode="numeric"
+                value={buyerCode}
+                onChange={(event) => setBuyerCode(event.target.value)}
+                placeholder="Email code"
+                className="min-h-12 rounded-xl border border-[#24221f]/25 bg-white px-4"
+              />
+            ) : null}
             <button
               type="submit"
-              className="min-h-12 rounded-xl bg-[#3f4513] px-5 font-mono text-xs uppercase tracking-wider text-[#f2ead9]"
+              disabled={Boolean(buyerSession) || isBuyerAuthPending || (privyAuthEnabled && !privyReady)}
+              className="min-h-12 rounded-xl bg-[#3f4513] px-5 font-mono text-xs uppercase tracking-wider text-[#f2ead9] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Continue
+              {signupButtonLabel}
             </button>
           </form>
           <div className="mt-4 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
             {buyerSession
               ? `Session ready. Embedded wallet ${shortenAddress(buyerSession.wallet)}`
-              : 'Privy will create the buyer session and embedded wallet.'}
+              : buyerAuthMessage}
           </div>
         </div>
 
@@ -778,7 +809,7 @@ function CareProfile({
   );
 }
 
-export default function App() {
+export default function App({ privyAuth = { enabled: false, ready: false, authenticated: false } }) {
   const ticketPrice = 3;
   const artOptions = [
     {
@@ -833,7 +864,15 @@ export default function App() {
   const [selectedArtId, setSelectedArtId] = useState(artOptions[0].id);
   const [selectedCauseName, setSelectedCauseName] = useState(causes[0].name);
   const [buyerEmail, setBuyerEmail] = useState('');
+  const [buyerCode, setBuyerCode] = useState('');
   const [buyerSession, setBuyerSession] = useState(null);
+  const [buyerAuthStep, setBuyerAuthStep] = useState('email');
+  const [buyerAuthMessage, setBuyerAuthMessage] = useState(
+    privyAuth.enabled
+      ? 'Privy will send a one-time email code and create the embedded wallet.'
+      : 'Add VITE_PRIVY_APP_ID to enable real Privy auth. Demo signup is available locally.',
+  );
+  const [isBuyerAuthPending, setIsBuyerAuthPending] = useState(false);
   const [worldVerification, setWorldVerification] = useState({
     status: 'not_started',
     message: 'World ID proof not started.',
@@ -854,10 +893,16 @@ export default function App() {
     status: 'open',
     winnerRequest: 'not_requested',
     vrfRequestId: null,
+    chainlinkTxHash: null,
     randomWord: null,
     winningEntry: null,
     prizeClaimStatus: 'not_ready',
   });
+  const [chainlinkRequestMessage, setChainlinkRequestMessage] = useState(
+    import.meta.env.VITE_CARELOTTO_CONTRACT_ADDRESS
+      ? 'Ready to request real Chainlink VRF from the deployed contract.'
+      : 'Add VITE_CARELOTTO_CONTRACT_ADDRESS to send real Chainlink VRF requests.',
+  );
   const selectedArt = artOptions.find((art) => art.id === selectedArtId) ?? artOptions[0];
   const selectedCause = causes.find((cause) => cause.name === selectedCauseName) ?? causes[0];
   const currentRoundEntries = useMemo(
@@ -946,14 +991,96 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!privyAuth.enabled) {
+      setBuyerAuthMessage('Add VITE_PRIVY_APP_ID to enable real Privy auth. Demo signup is available locally.');
+      return;
+    }
+
+    if (!privyAuth.ready) {
+      setBuyerAuthMessage('Preparing Privy email signup...');
+      return;
+    }
+
+    if (!privyAuth.authenticated) {
+      setBuyerAuthMessage('Privy will send a one-time email code and create the embedded wallet.');
+      return;
+    }
+
+    if (!privyAuth.walletAddress) {
+      setBuyerAuthMessage('Email verified. Privy is preparing the embedded wallet...');
+      return;
+    }
+
+    const email = privyAuth.email || buyerEmail.trim() || 'Privy buyer';
+
+    setBuyerEmail((currentEmail) => currentEmail || email);
+    setBuyerSession({
+      email,
+      wallet: privyAuth.walletAddress,
+    });
+    setBuyerAuthStep('connected');
+    setBuyerAuthMessage('Privy session ready. Embedded wallet is connected.');
+    setWorldVerification((current) =>
+      current.status === 'verified'
+        ? current
+        : {
+            status: 'ready',
+            message: 'Ready to request World ID proof.',
+            proofId: null,
+          },
+    );
+    setWorldRpContext(null);
+    setWorldProofSignal(null);
+  }, [
+    buyerEmail,
+    privyAuth.authenticated,
+    privyAuth.email,
+    privyAuth.enabled,
+    privyAuth.ready,
+    privyAuth.walletAddress,
+  ]);
+
   function handleHeartStart() {
     document.getElementById('play')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function handleBuyerSignup(event) {
+  async function handleBuyerSignup(event) {
     event.preventDefault();
 
     if (!buyerEmail.trim()) {
+      return;
+    }
+
+    if (privyAuth.enabled) {
+      if (!privyAuth.ready) {
+        setBuyerAuthMessage('Privy is still loading. Try again in a moment.');
+        return;
+      }
+
+      setIsBuyerAuthPending(true);
+
+      try {
+        if (buyerAuthStep === 'code') {
+          if (!buyerCode.trim()) {
+            setBuyerAuthMessage('Enter the code from your email.');
+            return;
+          }
+
+          await privyAuth.loginWithCode({ code: buyerCode.trim() });
+          setBuyerAuthMessage('Email verified. Creating embedded wallet...');
+          return;
+        }
+
+        await privyAuth.sendCode({ email: buyerEmail.trim() });
+        setBuyerAuthStep('code');
+        setBuyerAuthMessage('Check your email for the Privy code.');
+      } catch (error) {
+        setBuyerAuthMessage(error instanceof Error ? error.message : 'Privy signup could not be completed.');
+      } finally {
+        setIsBuyerAuthPending(false);
+      }
+
       return;
     }
 
@@ -969,6 +1096,8 @@ export default function App() {
     });
     setWorldRpContext(null);
     setWorldProofSignal(null);
+    setBuyerAuthStep('connected');
+    setBuyerAuthMessage('Demo session ready. Add a Privy app ID to use real auth.');
   }
 
   async function handleWorldVerification() {
@@ -1066,8 +1195,60 @@ export default function App() {
     }));
   }
 
-  function handleRequestLotteryWinner() {
+  async function handleRequestLotteryWinner() {
     if (lotteryRound.status !== 'closed' || currentRoundEntries.length === 0) {
+      return;
+    }
+
+    const contractAddress = import.meta.env.VITE_CARELOTTO_CONTRACT_ADDRESS;
+
+    if (contractAddress && !window.ethereum) {
+      setChainlinkRequestMessage('Install or open a browser wallet to send the real Chainlink VRF request.');
+      return;
+    }
+
+    if (contractAddress && window.ethereum) {
+      setChainlinkRequestMessage('Open your wallet to request Chainlink VRF on Sepolia.');
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: SEPOLIA_CHAIN_ID }],
+        });
+      } catch (switchError) {
+        if (switchError?.code !== 4902) {
+          setChainlinkRequestMessage(
+            switchError instanceof Error ? switchError.message : 'Could not switch wallet to Sepolia.',
+          );
+          return;
+        }
+      }
+
+      try {
+        const [from] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [
+            {
+              from,
+              to: contractAddress,
+              data: REQUEST_LOTTERY_WINNER_CALLDATA,
+            },
+          ],
+        });
+
+        setLotteryRound((round) => ({
+          ...round,
+          winnerRequest: 'requested',
+          chainlinkTxHash: txHash,
+        }));
+        setChainlinkRequestMessage('Chainlink VRF request transaction sent. The coordinator will fulfill it onchain.');
+      } catch (error) {
+        setChainlinkRequestMessage(
+          error instanceof Error ? error.message : 'Could not send the Chainlink VRF request transaction.',
+        );
+      }
+
       return;
     }
 
@@ -1087,10 +1268,12 @@ export default function App() {
       status: 'fulfilled',
       winnerRequest: 'fulfilled',
       vrfRequestId: requestId,
+      chainlinkTxHash: null,
       randomWord,
       winningEntry,
       prizeClaimStatus: 'ready',
     }));
+    setChainlinkRequestMessage('Demo VRF result generated. Deploy the contract to use Chainlink fulfillment.');
   }
 
   function handleOpenNextLotteryRound() {
@@ -1103,6 +1286,7 @@ export default function App() {
       status: 'open',
       winnerRequest: 'not_requested',
       vrfRequestId: null,
+      chainlinkTxHash: null,
       randomWord: null,
       winningEntry: null,
       prizeClaimStatus: 'not_ready',
@@ -1272,7 +1456,14 @@ export default function App() {
           setSelectedCauseName={setSelectedCauseName}
           buyerEmail={buyerEmail}
           setBuyerEmail={setBuyerEmail}
+          buyerCode={buyerCode}
+          setBuyerCode={setBuyerCode}
           buyerSession={buyerSession}
+          buyerAuthStep={buyerAuthStep}
+          buyerAuthMessage={buyerAuthMessage}
+          isBuyerAuthPending={isBuyerAuthPending}
+          privyAuthEnabled={privyAuth.enabled}
+          privyReady={privyAuth.ready}
           handleBuyerSignup={handleBuyerSignup}
           worldVerification={worldVerification}
           handleWorldVerification={handleWorldVerification}
@@ -1361,7 +1552,13 @@ export default function App() {
                     </p>
                   </div>
                   <span className="rounded-full border border-[#24221f]/20 bg-white/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
-                    {lotteryRound.status === 'fulfilled' ? 'VRF fulfilled' : lotteryRound.status === 'open' ? 'Open' : 'Closed'}
+                    {lotteryRound.status === 'fulfilled'
+                      ? 'VRF fulfilled'
+                      : lotteryRound.winnerRequest === 'requested'
+                        ? 'VRF requested'
+                        : lotteryRound.status === 'open'
+                          ? 'Open'
+                          : 'Closed'}
                   </span>
                 </div>
 
@@ -1399,10 +1596,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleRequestLotteryWinner}
-                    disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest === 'fulfilled'}
+                    disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest !== 'ready'}
                     className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    Request VRF winner
+                    Request onchain VRF
                   </button>
                   <button
                     type="button"
@@ -1422,18 +1619,21 @@ export default function App() {
                   </button>
                 </div>
 
-                {lotteryRound.vrfRequestId ? (
+                {lotteryRound.vrfRequestId || lotteryRound.chainlinkTxHash ? (
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
                       <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
                         Chainlink VRF request
                       </div>
                       <div className="mt-2 font-mono text-xs uppercase tracking-wide">
-                        {lotteryRound.vrfRequestId}
+                        {lotteryRound.vrfRequestId ?? shortenAddress(lotteryRound.chainlinkTxHash)}
                       </div>
                       <div className="mt-2 text-sm leading-6 text-[#24221f]/70">
-                        Random word {lotteryRound.randomWord} selects entry #
-                        {Number(lotteryRound.winningEntry?.winningEntryIndex ?? 0) + 1}.
+                        {lotteryRound.randomWord
+                          ? `Random word ${lotteryRound.randomWord} selects entry #${
+                              Number(lotteryRound.winningEntry?.winningEntryIndex ?? 0) + 1
+                            }.`
+                          : 'Request sent. Chainlink will call the contract back with the random word.'}
                       </div>
                     </div>
                     <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
@@ -1454,6 +1654,7 @@ export default function App() {
                 ) : null}
 
                 <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/50 p-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
+                  <div className="mb-3">{chainlinkRequestMessage}</div>
                   {currentRoundEntries.length > 0
                     ? currentRoundEntries
                         .map(
