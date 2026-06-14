@@ -219,7 +219,7 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
       <div className="mx-auto max-w-xs border border-[#24221f]/25 bg-[#fff8ea] p-5 shadow-sm">
         <div className="text-center font-serif text-xl">CareLotto</div>
         <div className="mt-2 text-center font-mono text-xs">
-          {lastPurchase ? `TICKET ${String(lastPurchase.ticketNumber).padStart(3, '0')}` : 'READY TO PURCHASE'}
+          {lastPurchase ? `TICKET ${String(lastPurchase.ticketNumber).padStart(3, '0')}` : 'PURCHASE CONFIRMATION'}
         </div>
         <div className="my-5 h-32 rounded-sm border border-[#24221f]/20 bg-[radial-gradient(circle_at_30%_30%,#df8076,transparent_35%),linear-gradient(135deg,#efe0c4,#8da05a)]" />
         <div className="mb-3 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[11px] uppercase tracking-wide">
@@ -245,11 +245,304 @@ function ReceiptPanel({ plays, selectedCause, split, lastPurchase, selectedArt, 
         <div className="mt-4 rounded-md border border-[#24221f]/10 bg-[#f2ead9]/70 p-3 font-mono text-[10px] uppercase tracking-wide">
           {lastPurchase
             ? `Purchase confirmed by ${lastPurchase.paymentMethod}. Split recorded.`
-            : `Payment: ${paymentMethod}. Signup and proof-of-human required.`}
+            : `Complete purchase to generate confirmation.`}
         </div>
         <Heart className="mx-auto mt-5 h-6 w-6 stroke-[#df8076]" />
       </div>
     </BlueprintFrame>
+  );
+}
+
+function AdminLotteryDashboard({
+  plays,
+  split,
+  lotteryRound,
+  currentRoundEntries,
+  closedRoundEntries,
+  causeTotals,
+  chainlinkRequestMessage,
+  handleCloseLotteryRound,
+  handleRequestLotteryWinner,
+  handleMarkPrizeClaimed,
+  handleOpenNextLotteryRound,
+}) {
+  const roundEntries = lotteryRound.winningEntry ? closedRoundEntries : currentRoundEntries;
+  const hasRandomWord = lotteryRound.randomWord !== null && lotteryRound.randomWord !== undefined;
+  const winningEntryIndex = hasRandomWord && roundEntries.length ? Number(lotteryRound.randomWord) % roundEntries.length : null;
+  const requestLabel = lotteryRound.vrfRequestId ?? lotteryRound.chainlinkTxHash;
+  const entriesLabel = lotteryRound.status === 'open' ? 'Current ticket entries' : 'Locked ticket entries';
+  const roundStatus =
+    lotteryRound.status === 'fulfilled'
+      ? 'Winner selected'
+      : lotteryRound.winnerRequest === 'requested'
+        ? 'VRF requested'
+        : lotteryRound.status === 'closed'
+          ? 'Entries locked'
+          : 'Open for sales';
+
+  const selectionSteps = [
+    {
+      label: '1 Lock entries',
+      text:
+        lotteryRound.status === 'open'
+          ? `${currentRoundEntries.length} ticket${currentRoundEntries.length === 1 ? '' : 's'} can still enter.`
+          : `${roundEntries.length} ticket${roundEntries.length === 1 ? '' : 's'} locked for this draw.`,
+    },
+    {
+      label: '2 Request VRF',
+      text: requestLabel ? `Request ${shortenAddress(requestLabel)} is recorded.` : 'Admin requests Chainlink randomness after close.',
+    },
+    {
+      label: '3 Select winner',
+      text:
+        lotteryRound.winningEntry && winningEntryIndex !== null
+          ? `Random word points to entry #${winningEntryIndex + 1}.`
+          : 'Callback returns the random word used onchain.',
+    },
+  ];
+
+  return (
+    <section id="admin" className="mx-auto max-w-7xl px-6 py-16">
+      <BlueprintFrame className="p-6 md:p-8">
+        <div className="grid gap-8 lg:grid-cols-[.74fr_1.26fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+              <ShieldCheck className="h-4 w-4 text-[#df8076]" /> Admin lottery dashboard
+            </div>
+            <h2 className="mt-3 font-serif text-4xl text-[#2f350d]">
+              See how Chainlink picks the prize winner.
+            </h2>
+            <p className="mt-4 leading-8 text-[#24221f]/75">
+              The operator closes ticket sales, requests Chainlink VRF, then shows the random word that selects one
+              artwork receipt from the locked round entries.
+            </p>
+
+            <div className="mt-6 grid gap-3">
+              {selectionSteps.map((step) => (
+                <div key={step.label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{step.label}</div>
+                  <div className="mt-2 text-sm leading-6 text-[#24221f]/75">{step.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              {[
+                ['Round', `#${lotteryRound.id}`],
+                ['Status', roundStatus],
+                ['Entries', roundEntries.length],
+                ['Prize pool', `$${roundEntries.length}`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                  <div className="mt-2 font-serif text-2xl text-[#2f350d]">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-mono text-xs uppercase tracking-wider">Operator controls</div>
+                  <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
+                    These controls model the round lifecycle the smart contract runs on Sepolia.
+                  </p>
+                </div>
+                <span className="rounded-full border border-[#24221f]/20 bg-white/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
+                  {roundStatus}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={handleCloseLotteryRound}
+                  disabled={lotteryRound.status !== 'open' || currentRoundEntries.length === 0}
+                  className="rounded-xl bg-[#3f4513] px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-[#f2ead9] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Close sales
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestLotteryWinner}
+                  disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest !== 'ready'}
+                  className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Select lottery winner
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkPrizeClaimed}
+                  disabled={!lotteryRound.winningEntry || lotteryRound.prizeClaimStatus === 'claimed'}
+                  className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Mark paid
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenNextLotteryRound}
+                  disabled={lotteryRound.status === 'open' || !lotteryRound.winningEntry}
+                  className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  New round
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/50 p-3 text-sm leading-6 text-[#24221f]/70">
+                {chainlinkRequestMessage}
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+                  <Sparkles className="h-4 w-4 text-[#df8076]" /> Chainlink randomization
+                </div>
+                <div className="grid gap-3">
+                  <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">VRF request</div>
+                    <div className="mt-2 font-mono text-xs uppercase tracking-wide">
+                      {requestLabel ? shortenAddress(requestLabel) : 'Not requested'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Random word</div>
+                    <div className="mt-2 break-all font-mono text-xs uppercase tracking-wide">
+                      {hasRandomWord ? lotteryRound.randomWord : 'Waiting for callback'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Selection math</div>
+                    <div className="mt-2 font-mono text-xs uppercase tracking-wide">
+                      {winningEntryIndex !== null
+                        ? `(${lotteryRound.randomWord} % ${roundEntries.length}) + 1 = ticket entry #${winningEntryIndex + 1}`
+                        : 'Random word % entries = winner'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+                  <Ticket className="h-4 w-4 text-[#df8076]" /> Winner and payout
+                </div>
+                {lotteryRound.winningEntry ? (
+                  <div>
+                    <div className="font-serif text-3xl text-[#2f350d]">
+                      Ticket #{String(lotteryRound.winningEntry.ticketNumber).padStart(3, '0')}
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-[#24221f]/75">
+                      {lotteryRound.winningEntry.artTitle} wins the round #{lotteryRound.winningEntry.roundId} lottery.
+                    </div>
+                    <div className="mt-4 grid gap-3">
+                      <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                          Payout wallet
+                        </div>
+                        <div className="mt-2 font-mono text-xs uppercase tracking-wide">
+                          {shortenAddress(lotteryRound.winningEntry.payoutWallet)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                          Prize status
+                        </div>
+                        <div className="mt-2 font-mono text-xs uppercase tracking-wide">
+                          ${roundEntries.length} ·{' '}
+                          {lotteryRound.prizeClaimStatus === 'claimed' ? 'Paid' : 'Ready to pay'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-4 text-sm leading-6 text-[#24221f]/70">
+                    Winner appears here after the Chainlink callback returns a random word.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+              <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+                <Users className="h-4 w-4 text-[#df8076]" /> {entriesLabel}
+              </div>
+              <div className="grid gap-2">
+                {roundEntries.length > 0 ? (
+                  roundEntries.map((entry, index) => (
+                    <div
+                      key={`${entry.roundId}-${entry.ticketNumber}`}
+                      className={`grid gap-2 rounded-xl border p-3 text-sm sm:grid-cols-[.45fr_1fr_1fr_1fr] ${
+                        lotteryRound.winningEntry?.ticketNumber === entry.ticketNumber
+                          ? 'border-[#df8076] bg-white'
+                          : 'border-[#24221f]/15 bg-white/55'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Entry</div>
+                        <div className="font-serif text-xl text-[#2f350d]">#{index + 1}</div>
+                      </div>
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Artwork</div>
+                        <div>{entry.artTitle}</div>
+                      </div>
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Cause</div>
+                        <div>{entry.cause}</div>
+                      </div>
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Payout</div>
+                        <div className="font-mono text-xs uppercase tracking-wide">{shortenAddress(entry.payoutWallet)}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-4 text-sm leading-6 text-[#24221f]/70">
+                    No ticket entries yet. Complete the buyer flow once to populate this round.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+              <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+                <Gift className="h-4 w-4 text-[#df8076]" /> Cause totals
+              </div>
+              <div className="grid gap-3">
+                {causeTotals.map((cause) => (
+                  <div key={cause.name} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div>
+                      <div className="font-serif text-xl">{cause.name}</div>
+                      <div className="font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
+                        {cause.wallet}
+                      </div>
+                    </div>
+                    <div className="font-mono text-xs uppercase tracking-wider">
+                      ${cause.total} from {cause.total} purchase{cause.total === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-4">
+              {[
+                ['All tickets', plays],
+                ['Artist total', `$${split.artist}`],
+                ['Cause total', `$${split.cause}`],
+                ['Lottery total', `$${split.lottery}`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                  <div className="mt-2 font-serif text-2xl text-[#2f350d]">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </BlueprintFrame>
+    </section>
   );
 }
 
@@ -1210,8 +1503,8 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         </div>
         <div className="hidden gap-6 md:flex">
           <a href="#how">How it works</a>
-          <a href="#impact">Impact</a>
           <a href="#play">Play</a>
+          <a href="#admin">Admin</a>
         </div>
         <a href="#play" className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5">
           Begin
@@ -1315,198 +1608,30 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         </div>
       </section>
 
-      <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
-        <BlueprintFrame className="p-6 md:p-8">
-          <div className="grid gap-8 lg:grid-cols-[.7fr_1.3fr]">
-            <div>
-              <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
-                <Gift className="h-4 w-4 text-[#df8076]" /> Impact dashboard
-              </div>
-              <h2 className="mt-3 font-serif text-4xl text-[#2f350d]">
-                Every purchase updates the care ledger.
-              </h2>
-              <p className="mt-4 leading-8 text-[#24221f]/75">
-                The dashboard mirrors the contract split so judges can see how artist funding, cause support, and
-                the lottery pool move together across each managed round.
-              </p>
-              <div className="mt-5 rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
-                  Chainlink handoff
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
-                  Close the active round when ticket sales end, then request Chainlink VRF winner selection from the
-                  closed artwork-ticket entries.
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-4">
-              <div className="grid gap-3 sm:grid-cols-4">
-                {[
-                  ['Tickets', plays],
-                  ['Artist', `$${split.artist}`],
-                  ['Causes', `$${split.cause}`],
-                  ['Lottery', `$${split.lottery}`],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
-                    <div className="mt-2 font-serif text-3xl text-[#2f350d]">{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="font-mono text-xs uppercase tracking-wider">Lottery round management</div>
-                    <div className="mt-2 font-serif text-3xl text-[#2f350d]">Round #{lotteryRound.id}</div>
-                    <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
-                      Entries and pool totals are isolated by round so Chainlink can select from a closed entry set.
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-[#24221f]/20 bg-white/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
-                    {lotteryRound.status === 'fulfilled'
-                      ? 'VRF fulfilled'
-                      : lotteryRound.winnerRequest === 'requested'
-                        ? 'VRF requested'
-                        : lotteryRound.status === 'open'
-                          ? 'Open'
-                          : 'Closed'}
-                  </span>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  {[
-                    ['Round entries', currentRoundEntries.length],
-                    ['Round pool', `$${currentRoundEntries.length}`],
-                    [
-                      'Winner request',
-                      lotteryRound.winnerRequest === 'fulfilled'
-                        ? 'Fulfilled'
-                        : lotteryRound.winnerRequest === 'requested'
-                          ? 'Requested'
-                        : lotteryRound.winnerRequest === 'ready'
-                          ? 'Ready'
-                          : 'Not ready',
-                    ],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
-                      <div className="mt-2 font-serif text-2xl text-[#2f350d]">{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleCloseLotteryRound}
-                    disabled={lotteryRound.status !== 'open' || currentRoundEntries.length === 0}
-                    className="rounded-xl bg-[#3f4513] px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-[#f2ead9] disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    Close round
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRequestLotteryWinner}
-                    disabled={lotteryRound.status !== 'closed' || lotteryRound.winnerRequest !== 'ready'}
-                    className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    Request onchain VRF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleMarkPrizeClaimed}
-                    disabled={!lotteryRound.winningEntry || lotteryRound.prizeClaimStatus === 'claimed'}
-                    className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    Mark claimed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenNextLotteryRound}
-                    disabled={lotteryRound.status === 'open' || !lotteryRound.winningEntry}
-                    className="rounded-xl border border-[#24221f]/25 px-4 py-3 font-mono text-[10px] uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    Open next round
-                  </button>
-                </div>
-
-                {lotteryRound.vrfRequestId || lotteryRound.chainlinkTxHash ? (
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
-                        Chainlink VRF request
-                      </div>
-                      <div className="mt-2 font-mono text-xs uppercase tracking-wide">
-                        {lotteryRound.vrfRequestId ?? shortenAddress(lotteryRound.chainlinkTxHash)}
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-[#24221f]/70">
-                        {lotteryRound.randomWord
-                          ? `Random word ${lotteryRound.randomWord} selects entry #${
-                              Number(lotteryRound.winningEntry?.winningEntryIndex ?? 0) + 1
-                            }.`
-                          : 'Request sent. Chainlink will call the contract back with the random word.'}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
-                        Winning artwork ticket
-                      </div>
-                      <div className="mt-2 font-serif text-2xl text-[#2f350d]">
-                        #{String(lotteryRound.winningEntry?.ticketNumber ?? 0).padStart(3, '0')}{' '}
-                        {lotteryRound.winningEntry?.artTitle}
-                      </div>
-                      <div className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-                        Payout wallet {shortenAddress(lotteryRound.winningEntry?.payoutWallet ?? '')} · Prize{' '}
-                        ${closedRoundEntries.length || currentRoundEntries.length} ·{' '}
-                        {lotteryRound.prizeClaimStatus === 'claimed' ? 'Claimed' : 'Ready to claim'}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/50 p-3 font-mono text-[10px] uppercase tracking-wide text-[#24221f]/60">
-                  <div className="mb-3">{chainlinkRequestMessage}</div>
-                  {currentRoundEntries.length > 0
-                    ? currentRoundEntries
-                        .map(
-                          (entry) =>
-                            `#${String(entry.ticketNumber).padStart(3, '0')} ${entry.artTitle} -> ${shortenAddress(
-                              entry.payoutWallet,
-                            )}`,
-                        )
-                        .join(' / ')
-                    : 'No entries in this round yet.'}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-                <div className="mb-3 font-mono text-xs uppercase tracking-wider">Cause totals</div>
-                <div className="grid gap-3">
-                  {causeTotals.map((cause) => (
-                    <div key={cause.name} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
-                      <div>
-                        <div className="font-serif text-xl">{cause.name}</div>
-                        <div className="font-mono text-[10px] uppercase tracking-wide text-[#24221f]/55">
-                          {cause.wallet}
-                        </div>
-                      </div>
-                      <div className="font-mono text-xs uppercase tracking-wider">
-                        ${cause.total} from {cause.total} purchase{cause.total === 1 ? '' : 's'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </BlueprintFrame>
-      </section>
+      <AdminLotteryDashboard
+        plays={plays}
+        split={split}
+        lotteryRound={lotteryRound}
+        currentRoundEntries={currentRoundEntries}
+        closedRoundEntries={closedRoundEntries}
+        causeTotals={causeTotals}
+        chainlinkRequestMessage={chainlinkRequestMessage}
+        handleCloseLotteryRound={handleCloseLotteryRound}
+        handleRequestLotteryWinner={handleRequestLotteryWinner}
+        handleMarkPrizeClaimed={handleMarkPrizeClaimed}
+        handleOpenNextLotteryRound={handleOpenNextLotteryRound}
+      />
 
       <footer className="mx-auto max-w-7xl px-6 pb-10 pt-8">
         <div className="flex flex-col justify-between gap-4 border-t border-[#24221f]/20 pt-6 font-mono text-xs uppercase tracking-wider md:flex-row">
           <span>Drawing no. C-684 · CareLotto system overview</span>
-          <span>Care is everything</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <span>Care is everything</span>
+            <a href="#admin" className="inline-flex items-center gap-1 border-b border-[#24221f]/30 pb-1 hover:border-[#df8076]">
+              Admin
+              <ArrowRight className="h-3 w-3" />
+            </a>
+          </div>
         </div>
       </footer>
     </main>
