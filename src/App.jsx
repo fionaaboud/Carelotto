@@ -289,15 +289,17 @@ function AdminLotteryDashboard({
           : `${roundEntries.length} ticket${roundEntries.length === 1 ? '' : 's'} locked for this draw.`,
     },
     {
-      label: '2 Request VRF',
-      text: requestLabel ? `Request ${shortenAddress(requestLabel)} is recorded.` : 'Admin requests Chainlink randomness after close.',
+      label: '2 Ask Chainlink',
+      text: requestLabel
+        ? `Chainlink request ${shortenAddress(requestLabel)} is recorded.`
+        : 'Admin asks Chainlink for a fair random number after close.',
     },
     {
       label: '3 Select winner',
       text:
         lotteryRound.winningEntry && winningEntryIndex !== null
-          ? `Random word points to entry #${winningEntryIndex + 1}.`
-          : 'Callback returns the random word used onchain.',
+          ? `Random number points to entry #${winningEntryIndex + 1}.`
+          : 'Chainlink returns the random number used onchain.',
     },
   ];
 
@@ -313,7 +315,7 @@ function AdminLotteryDashboard({
               See how Chainlink picks the prize winner.
             </h2>
             <p className="mt-4 leading-8 text-[#24221f]/75">
-              The operator closes ticket sales, requests Chainlink VRF, then shows the random word that selects one
+              The operator closes ticket sales, asks Chainlink for a fair random number, then shows how it selects one
               artwork receipt from the locked round entries.
             </p>
 
@@ -408,7 +410,9 @@ function AdminLotteryDashboard({
                     </div>
                   </div>
                   <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
-                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">Random word</div>
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">
+                      Chainlink random number
+                    </div>
                     <div className="mt-2 break-all font-mono text-xs uppercase tracking-wide">
                       {hasRandomWord ? lotteryRound.randomWord : 'Waiting for callback'}
                     </div>
@@ -418,7 +422,7 @@ function AdminLotteryDashboard({
                     <div className="mt-2 font-mono text-xs uppercase tracking-wide">
                       {winningEntryIndex !== null
                         ? `(${lotteryRound.randomWord} % ${roundEntries.length}) + 1 = ticket entry #${winningEntryIndex + 1}`
-                        : 'Random word % entries = winner'}
+                        : 'Random number % entries = winner'}
                     </div>
                   </div>
                 </div>
@@ -458,7 +462,7 @@ function AdminLotteryDashboard({
                   </div>
                 ) : (
                   <div className="rounded-xl border border-[#24221f]/15 bg-white/60 p-4 text-sm leading-6 text-[#24221f]/70">
-                    Winner appears here after the Chainlink callback returns a random word.
+                    Winner appears here after Chainlink returns the random number.
                   </div>
                 )}
               </div>
@@ -538,6 +542,117 @@ function AdminLotteryDashboard({
                   <div className="mt-2 font-serif text-2xl text-[#2f350d]">{value}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </BlueprintFrame>
+    </section>
+  );
+}
+
+function ImpactDashboard({ plays, split, lotteryRound, currentRoundEntries, causeTotals }) {
+  const statusLabel =
+    lotteryRound.status === 'fulfilled'
+      ? 'Winner selected'
+      : lotteryRound.winnerRequest === 'requested'
+        ? 'Selecting winner'
+        : lotteryRound.status === 'closed'
+          ? 'Entries locked'
+          : 'Open';
+
+  return (
+    <section id="impact" className="mx-auto max-w-7xl px-6 py-16">
+      <BlueprintFrame className="p-6 md:p-8">
+        <div className="grid gap-8 lg:grid-cols-[.7fr_1.3fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+              <Gift className="h-4 w-4 text-[#df8076]" /> Impact dashboard
+            </div>
+            <h2 className="mt-3 font-serif text-4xl text-[#2f350d]">
+              Every purchase updates the care ledger.
+            </h2>
+            <p className="mt-4 leading-8 text-[#24221f]/75">
+              Each artwork purchase becomes a lottery entry and adds one share for the artist, one for the selected
+              cause, and one for the prize pool.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-4">
+              {[
+                ['Tickets', plays],
+                ['Artist', `$${split.artist}`],
+                ['Causes', `$${split.cause}`],
+                ['Lottery', `$${split.lottery}`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                  <div className="mt-2 font-serif text-3xl text-[#2f350d]">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-mono text-xs uppercase tracking-wider">Current lottery round</div>
+                  <div className="mt-2 font-serif text-3xl text-[#2f350d]">Round #{lotteryRound.id}</div>
+                  <p className="mt-2 text-sm leading-6 text-[#24221f]/70">
+                    Purchased artwork receipts count as entries for the active prize round.
+                  </p>
+                </div>
+                <span className="rounded-full border border-[#24221f]/20 bg-white/70 px-3 py-2 font-mono text-[10px] uppercase tracking-wider">
+                  {statusLabel}
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ['Round entries', currentRoundEntries.length],
+                  ['Prize pool', `$${currentRoundEntries.length}`],
+                  [
+                    'Winner',
+                    lotteryRound.winningEntry
+                      ? `Ticket #${String(lotteryRound.winningEntry.ticketNumber).padStart(3, '0')}`
+                      : 'Not selected',
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-[#24221f]/15 bg-white/60 p-3">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-[#24221f]/55">{label}</div>
+                    <div className="mt-2 font-serif text-2xl text-[#2f350d]">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/50 p-3 text-sm leading-6 text-[#24221f]/70">
+                {currentRoundEntries.length > 0
+                  ? currentRoundEntries
+                      .map(
+                        (entry) =>
+                          `#${String(entry.ticketNumber).padStart(3, '0')} ${entry.artTitle} for ${entry.cause}`,
+                      )
+                      .join(' / ')
+                  : 'No artwork entries yet.'}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
+              <div className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider">
+                <Users className="h-4 w-4 text-[#df8076]" /> Cause totals
+              </div>
+              <div className="grid gap-3">
+                {causeTotals.map((cause) => (
+                  <div key={cause.name} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div>
+                      <div className="font-serif text-xl">{cause.name}</div>
+                      <div className="text-sm leading-6 text-[#24221f]/65">{cause.description}</div>
+                    </div>
+                    <div className="font-mono text-xs uppercase tracking-wider">
+                      ${cause.total} from {cause.total} purchase{cause.total === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -861,11 +976,15 @@ function CheckoutPanel({
 
       <div className="mt-8">
         <div className="rounded-2xl border border-[#24221f]/20 bg-[#fff8ea]/70 p-4">
-          <StepHeading number="5" title="Payment method" helper="Choose card for the demo path or crypto wallet for later." />
+          <StepHeading
+            number="5"
+            title="Payment method"
+            helper="The email wallet stores the receipt and lottery ticket. Payment comes from card or an external crypto wallet."
+          />
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {[
-              ['card', 'Credit card', CreditCard],
-              ['crypto', 'Crypto wallet', Wallet],
+              ['card', 'Pay by card', CreditCard],
+              ['crypto', 'Use crypto wallet', Wallet],
             ].map(([method, label, Icon]) => (
               <button
                 key={method}
@@ -880,6 +999,12 @@ function CheckoutPanel({
               </button>
             ))}
           </div>
+
+          {paymentMethod === 'card' ? (
+            <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-3 text-sm leading-6 text-[#24221f]/70">
+              Card pays the $3 purchase. The email wallet receives the image receipt and lottery ticket.
+            </div>
+          ) : null}
 
           {paymentMethod === 'crypto' ? (
             <div className="mt-4 rounded-xl border border-[#24221f]/15 bg-white/60 p-3 font-mono text-[10px] uppercase tracking-wide">
@@ -924,7 +1049,7 @@ function CheckoutPanel({
                   onClick={handleConnectWallet}
                   className="inline-flex w-full items-center justify-center rounded-lg bg-[#3f4513] px-4 py-3 text-[#f2ead9]"
                 >
-                  Connect demo wallet
+                  Connect external wallet
                 </button>
               )}
             </div>
@@ -1036,6 +1161,9 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
     winningEntry: null,
     prizeClaimStatus: 'not_ready',
   });
+  const [activePage, setActivePage] = useState(() =>
+    typeof window !== 'undefined' && window.location.hash === '#admin' ? 'admin' : 'site',
+  );
   const [chainlinkRequestMessage, setChainlinkRequestMessage] = useState(
     import.meta.env.VITE_CARELOTTO_CONTRACT_ADDRESS
       ? 'Ready to request real Chainlink VRF from the deployed contract.'
@@ -1068,6 +1196,38 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
       })),
     [causes, purchases],
   );
+  const isAdminPage = activePage === 'admin';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleHashChange = () => {
+      setActivePage(window.location.hash === '#admin' ? 'admin' : 'site');
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || isAdminPage) {
+      return;
+    }
+
+    const targetId = window.location.hash.slice(1);
+    if (!targetId) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      target?.scrollIntoView({ block: 'start' });
+    });
+  }, [isAdminPage]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1502,15 +1662,59 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
           CareLotto
         </div>
         <div className="hidden gap-6 md:flex">
-          <a href="#how">How it works</a>
-          <a href="#play">Play</a>
-          <a href="#admin">Admin</a>
+          {isAdminPage ? (
+            <>
+              <a href="#">Home</a>
+              <a href="#play">Play flow</a>
+            </>
+          ) : (
+            <>
+              <a href="#how">How it works</a>
+              <a href="#play">Play</a>
+              <a href="#impact">Impact</a>
+            </>
+          )}
         </div>
-        <a href="#play" className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5">
-          Begin
+        <a
+          href="#play"
+          className="rounded-full border border-[#24221f]/25 px-4 py-2 hover:bg-[#24221f]/5"
+        >
+          {isAdminPage ? 'Back to play' : 'Begin'}
         </a>
       </nav>
 
+      {isAdminPage ? (
+        <>
+          <section className="mx-auto max-w-7xl px-6 pb-2 pt-8">
+            <div className="max-w-3xl">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#24221f]/20 bg-[#f8efd9]/70 px-4 py-2 font-mono text-xs uppercase tracking-wider">
+                <ShieldCheck className="h-4 w-4 text-[#df8076]" /> Operator view
+              </div>
+              <h1 className="font-serif text-5xl leading-[.95] tracking-tight text-[#2f350d] md:text-7xl">
+                Admin dashboard
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-[#24221f]/75">
+                Close sales, ask Chainlink to select the winner, and track the prize payout from one focused place.
+              </p>
+            </div>
+          </section>
+
+          <AdminLotteryDashboard
+            plays={plays}
+            split={split}
+            lotteryRound={lotteryRound}
+            currentRoundEntries={currentRoundEntries}
+            closedRoundEntries={closedRoundEntries}
+            causeTotals={causeTotals}
+            chainlinkRequestMessage={chainlinkRequestMessage}
+            handleCloseLotteryRound={handleCloseLotteryRound}
+            handleRequestLotteryWinner={handleRequestLotteryWinner}
+            handleMarkPrizeClaimed={handleMarkPrizeClaimed}
+            handleOpenNextLotteryRound={handleOpenNextLotteryRound}
+          />
+        </>
+      ) : (
+        <>
       <section className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-20 pt-8 lg:grid-cols-[1fr_.9fr]">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#24221f]/20 bg-[#f8efd9]/70 px-4 py-2 font-mono text-xs uppercase tracking-wider">
@@ -1608,29 +1812,34 @@ export default function App({ privyAuth = { enabled: false, ready: false, authen
         </div>
       </section>
 
-      <AdminLotteryDashboard
-        plays={plays}
-        split={split}
-        lotteryRound={lotteryRound}
-        currentRoundEntries={currentRoundEntries}
-        closedRoundEntries={closedRoundEntries}
-        causeTotals={causeTotals}
-        chainlinkRequestMessage={chainlinkRequestMessage}
-        handleCloseLotteryRound={handleCloseLotteryRound}
-        handleRequestLotteryWinner={handleRequestLotteryWinner}
-        handleMarkPrizeClaimed={handleMarkPrizeClaimed}
-        handleOpenNextLotteryRound={handleOpenNextLotteryRound}
-      />
+          <ImpactDashboard
+            plays={plays}
+            split={split}
+            lotteryRound={lotteryRound}
+            currentRoundEntries={currentRoundEntries}
+            causeTotals={causeTotals}
+          />
+        </>
+      )}
 
       <footer className="mx-auto max-w-7xl px-6 pb-10 pt-8">
         <div className="flex flex-col justify-between gap-4 border-t border-[#24221f]/20 pt-6 font-mono text-xs uppercase tracking-wider md:flex-row">
-          <span>Drawing no. C-684 · CareLotto system overview</span>
+          <span>{isAdminPage ? 'Drawing no. C-684 · CareLotto admin controls' : 'Drawing no. C-684 · CareLotto system overview'}</span>
           <div className="flex flex-wrap items-center gap-4">
-            <span>Care is everything</span>
-            <a href="#admin" className="inline-flex items-center gap-1 border-b border-[#24221f]/30 pb-1 hover:border-[#df8076]">
-              Admin
-              <ArrowRight className="h-3 w-3" />
-            </a>
+            {isAdminPage ? (
+              <a href="#play" className="inline-flex items-center gap-1 border-b border-[#24221f]/30 pb-1 hover:border-[#df8076]">
+                Back to buyer flow
+                <ArrowRight className="h-3 w-3" />
+              </a>
+            ) : (
+              <>
+                <span>Care is everything</span>
+                <a href="#admin" className="inline-flex items-center gap-1 border-b border-[#24221f]/30 pb-1 hover:border-[#df8076]">
+                  Admin
+                  <ArrowRight className="h-3 w-3" />
+                </a>
+              </>
+            )}
           </div>
         </div>
       </footer>
